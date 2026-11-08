@@ -14,7 +14,7 @@ const response = (content = JSON.stringify(answer()), model = 'test/model', fini
 test('per-decision schema excludes wrong-phase votes and execution at rounded deadline', () => {
   const schema = decisionSchemaFor({ phase: 'negotiation', logicalTimeMs: 10000, publicRules: JSON.stringify({ roundStartedMs: 0, negotiationDeadlineMs: 15000, scheduling: { mode: 'fixed_5s' } }) });
   const branches = schema.properties.actions.items.anyOf;
-  assert.ok(branches.every((b: any) => b.properties.type.const !== 'vote' && b.properties.scheduledTimeMs.maximum === 10000));
+  assert.ok(branches.every((b: any) => b.properties.type.enum[0] !== 'vote' && b.properties.scheduledTimeMs.maximum === 10000));
   const commit = decisionSchemaFor({ phase: 'commit', logicalTimeMs: 15000, publicRules: '{}' });
   assert.equal(commit.properties.actions.maxItems, 1);
   assert.equal(commit.properties.actions.items.anyOf[0].properties.scheduledTimeMs.const, 15000);

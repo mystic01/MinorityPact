@@ -20,5 +20,5 @@ export interface DecisionInput {
   ownNotes: StrategyNote[]; wakeReasons: string[];
 }
 export interface AgentController {
-  decide(input: Readonly<DecisionInput>, signal: AbortSignal): Promise<DecisionResult>;
+  decide(input: Readonly<DecisionInput>, signal: AbortSignal, validationFeedback?: string): Promise<DecisionResult>;
 }

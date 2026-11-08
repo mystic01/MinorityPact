@@ -9,6 +9,7 @@ export interface PublicView {
   standings: Standing[]; model: { provider: 'openrouter'; model: string; displayName?: string };
   seatModels?: Record<string, { model: string; displayName?: string }>;
   rounds?: number; negotiationTimeMs?: number; roundStartedMs?: number;
+  outcome?: Outcome | null;
 }
 export interface PublicEvent {
   eventId: string; batchId: string; commitSeq: number; logicalTimeMs: number;

@@ -7,7 +7,7 @@ export interface SchedulerCheckpoint {
   completedDecisions?: SchedulerCheckpoint['pendingDecisions'];
   logicalTimeMs: number;
   subscriptions: Record<string, NextWake>;
-  pendingDecisions: { decisionId: string; snapshot: DecisionSnapshot; result?: DecisionResult }[];
+  pendingDecisions: { decisionId: string; snapshot: DecisionSnapshot; result?: DecisionResult; validationFeedback?: string }[];
   pendingActions: { actorId: string; decisionId: string; action: DecisionResult['actions'][number] }[];
 }
 export interface StoredEvent {

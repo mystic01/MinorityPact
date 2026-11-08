@@ -54,7 +54,7 @@ test('failed decisions resume original snapshots without recalling successful pe
     assert.equal((await store.readEvents('s', 0)).length, 0);
     fail = false; await new DecisionCoordinator(store, 's', controllers).step(pace);
     assert.equal(counts.A, 1); assert.equal(counts.B, 4); assert.equal(new Set(snapshots).size, 1);
-    assert.equal((await store.loadCheckpoint('s'))?.completedDecisions?.length, 5);
+    assert.equal(store.readCompletedDecisions('s').length, 5);
   } finally { store.close(); }
 });
 test('silent agents are not polled each window; scripted ten-round game completes', async () => {

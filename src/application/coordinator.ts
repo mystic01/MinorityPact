@@ -90,11 +90,12 @@ export class DecisionCoordinator {
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
           const signal = AbortSignal.timeout(timeoutMs);
-          const raw = await Promise.race([this.controllers[pending.snapshot.input.agentId]!.decide(structuredClone(pending.snapshot.input), signal), new Promise<never>((_, reject) => signal.addEventListener('abort', () => reject(new Error('Decision timeout')), { once: true }))]);
+          const raw = await Promise.race([this.controllers[pending.snapshot.input.agentId]!.decide(structuredClone(pending.snapshot.input), signal, pending.validationFeedback), new Promise<never>((_, reject) => signal.addEventListener('abort', () => reject(new Error('Decision timeout')), { once: true }))]);
           const result = parseDecision(raw); this.validate(result, pending.snapshot.input, state, config);
           pending.result = result;
           writes = writes.then(() => this.save(cp)); await writes; return;
         } catch (error) {
+          pending.validationFeedback = 'Previous output was rejected. Follow the exact action schema, current phase and legal scheduledTimeMs. Do not invent action types. Keep the same game snapshot; no new game information is available.';
           this.store.recordAudit(this.sessionId, pending.snapshot.snapshotId, { kind: 'decision_rejected', attempt: attempt + 1, reason: error instanceof Error ? error.message : 'Unknown error' });
           last = error;
         }

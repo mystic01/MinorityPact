@@ -8,6 +8,8 @@ OpenRouter 交付補充：T1 建立 llm.provider/model/displayName/parameters �
 
 ## 最短閱讀路徑
 
+最新：T6/T7網頁與回播已實作並經Chrome QA；T8矩陣/report工具完成，真實多模型smoke進行中。以 docs/PROGRESS.md 最上方及T8_PROGRESS.md為準。原「同模型」要求已依使用者最新決定改成每席不同模型。
+
 目前接續點：T5 工程串接已完成、真正 LLM 驗收待設定；最新狀態以 docs/T5_PROGRESS.md 為準。T6 可先做控制台，但其真正對局整合驗收仍需 T5 實測。
 
 每次接手先讀本頁、ARCHITECTURE.md 第 2 節與任務指定章節，再按需讀 REQUIREMENT.md 指定節次。REQUIREMENT.md 是完整需求來源；不需要每個小任務重讀訪談表、重查候選 repo 或重新選框架。遇到實際矛盾才回溯原文。

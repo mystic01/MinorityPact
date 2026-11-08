@@ -21,10 +21,10 @@ const obj = (properties: Record<string, unknown>) => ({ type: 'object', properti
 const base = { actionId: str, scheduledTimeMs: number };
 export const DECISION_SCHEMA = obj({
   actions: { type: 'array', items: { anyOf: [
-    obj({ ...base, type: { const: 'send_public_message' }, message: str }),
-    obj({ ...base, type: { const: 'send_private_message' }, recipientId: str, message: str }),
-    obj({ ...base, type: { const: 'set_ready' }, ready: { type: 'boolean' } }),
-    obj({ ...base, type: { const: 'vote' }, color: { type: 'string', enum: ['red', 'blue'] } }),
+    obj({ ...base, type: { type: 'string', enum: ['send_public_message'] }, message: str }),
+    obj({ ...base, type: { type: 'string', enum: ['send_private_message'] }, recipientId: str, message: str }),
+    obj({ ...base, type: { type: 'string', enum: ['set_ready'] }, ready: { type: 'boolean' } }),
+    obj({ ...base, type: { type: 'string', enum: ['vote'] }, color: { type: 'string', enum: ['red', 'blue'] } }),
   ] } },
   nextWake: obj({ atGameTimeMs: { anyOf: [number, { type: 'null' }] }, onEvents: { type: 'array', items: { type: 'string', enum: ['private_message_received', 'public_message_received'] } } }),
   strategyNote: obj({ goal: str, plan: str, whyThisAction: str, predictedOutcome: str, observedEventIds: { type: 'array', items: str }, revisionReason: { type: ['string', 'null'] } }),
@@ -33,7 +33,7 @@ export function decisionSchemaFor(input: { phase: string; logicalTimeMs: number;
   const schema = structuredClone(DECISION_SCHEMA) as any;
   const rules = JSON.parse(input.publicRules) as Record<string, any>;
   const branches = schema.properties.actions.items.anyOf as any[];
-  schema.properties.actions.items.anyOf = branches.filter(b => input.phase === 'commit' ? b.properties.type.const === 'vote' : b.properties.type.const !== 'vote');
+  schema.properties.actions.items.anyOf = branches.filter(b => input.phase === 'commit' ? b.properties.type.enum[0] === 'vote' : b.properties.type.enum[0] !== 'vote');
   for (const b of schema.properties.actions.items.anyOf) {
     if (input.phase === 'commit') b.properties.scheduledTimeMs = { type: 'integer', const: input.logicalTimeMs };
     else {

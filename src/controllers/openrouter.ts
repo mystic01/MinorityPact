@@ -10,10 +10,11 @@ export class OpenRouterController implements AgentController {
     if (!key.trim() || !llm.model.trim()) throw new Error('OpenRouter key and model required');
     this.llm = structuredClone(llm); this.key = key; this.audit = audit; this.fetcher = fetcher;
   }
-  async decide(input: Readonly<DecisionInput>, signal: AbortSignal): Promise<DecisionResult> {
+  async decide(input: Readonly<DecisionInput>, signal: AbortSignal, validationFeedback?: string): Promise<DecisionResult> {
     const body = { ...this.llm.parameters, model: this.llm.model, stream: false,
       provider: { require_parameters: true },
-      messages: [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: JSON.stringify(input) }],
+      messages: [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: JSON.stringify(input) },
+        { role: 'user', content: `${validationFeedback ?? 'Protocol reminder:'} Use EXACT action shapes from this JSON Schema. ${JSON.stringify(decisionSchemaFor(input))}` }],
       response_format: { type: 'json_schema', json_schema: { name: 'minority_decision', strict: true, schema: decisionSchemaFor(input) } } };
     const started = Date.now(); let responseBody: string | null = null; let status: number | null = null;
     const redact = (value: unknown): unknown => JSON.parse(JSON.stringify(value).split(this.key).join('[REDACTED]'));

@@ -38,7 +38,7 @@ test('disk reopen preserves subscriptions and pending actions exactly', async ()
     cp.pendingActions.push({ actorId: 'A', decisionId: 'd', action: { type: 'send_public_message', actionId: 'future', scheduledTimeMs: 10, message: 'later' } });
     await store.commitBatch({ ...request([]), checkpoint: cp });
     store.close(); store = new SqliteEventStore(path);
-    assert.deepEqual(await store.loadCheckpoint('s'), cp);
+    assert.deepEqual(await store.loadCheckpoint('s'), { ...cp, completedDecisions: [] });
     assert.equal(store.getConfig('s').llm.displayName, 'Test Model');
     assert.deepEqual(await store.commitBatch({ ...request([]), checkpoint: cp }), { kind: 'already_committed', version: 1 });
   } finally { store.close(); rmSync(dir, { recursive: true }); }

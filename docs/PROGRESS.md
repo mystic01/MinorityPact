@@ -1,5 +1,7 @@
 # 實作進度 — 2026-11-08
 
+最新T8工程：12格scripted矩陣、公開指標報告工具及Chrome瀏覽器QA已建立；91項測試、前後端型別、build與browser smoke通過。T6 b760232、T7 acac7dd已推送。真實五Gemini對局仍進行中，不提前宣稱終局成功；詳見T8_PROGRESS.md。
+
 最新T7：完成依原logicalTime播放、倍速、公知／全知切換與seek；T6已推送 b760232。真實多模型smoke已啟動，五席均成功回應，正在完成回合；不提前宣稱真實驗收通過。詳見T7_PROGRESS.md。
 
 最新 T6：本機 Vue 控制台／HTTP／SSE 已建立，五席不同 Gemini 預設已接線（使用者最新需求），88項測試、前後端型別與build通過。見 T6_PROGRESS.md。已偵測本機key，下一步真實smoke及T7/T8；不輸出憑證。
