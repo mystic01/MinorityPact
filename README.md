@@ -38,6 +38,24 @@ npm.cmd run game -- resume configs/local.json data/games.sqlite SESSION_ID
 
 CLI 依真實時間等待邏輯時間間隔，LLM 推理期間停鐘。失敗最多重試 2 次後保留 pending decisions，退出並允許 resume。資料庫旁 `.lock` 防止兩個 CLI 同時執行；若程序被強制終止留下 lock，確認沒有對局程序仍執行後再手動移除 lock。不要同時以其他程式寫入同一資料庫。
 
+GLM 5.3／Flash 與 Qwen3.8 Flash 在未指定 `llm.parameters.reasoning` 時採 `{"effort":"low"}`，避免推理吃完輸出預算而沒有決策 JSON；明確設定會優先保留。此預設於載入席位時套用，因此重啟後恢復舊局也適用，不改寫原始設定或成功決策。低推理仍可能截斷；截斷會停止自動重試，需手動處理後再繼續，不自動提高費用上限。
+
+## 本機 LLM 呼叫紀錄
+
+`data/games.sqlite` 的 `decision_audit` 表保存未加密的 JSON 明文。可用 SQLite 檢視工具以唯讀模式開啟，執行：
+
+```sql
+SELECT id, session_id, snapshot_id,
+       json_extract(record, '$.kind') AS kind,
+       json_extract(record, '$.request.model') AS model,
+       json_extract(record, '$.status') AS http_status,
+       json_extract(record, '$.code') AS code,
+       record
+FROM decision_audit ORDER BY id DESC LIMIT 50;
+```
+
+`provider_response` 記錄請求提示／快照、原始回應（`rawResponse`）、起訖時間與成功狀態；usage／費用以供應商回傳為準，不是完整帳單。`decision_rejected` 記錄嘗試次數及拒絕原因。API key 不寫入請求 headers 稽核，回顯的 key 亦會遮蔽。資料含私訊及策略，不透過觀戰網頁公開；`data/` 已排除版控。舊 smoke 的紀錄另存於 `data/smoke.sqlite`。
+
 真正 LLM smoke 與實驗進度見 docs/PROGRESS.md；模擬 HTTP 測試僅證明串接與流程，不證明模型策略能力。API 實作參考 [OpenRouter API](https://openrouter.ai/docs/api_reference/overview) 與 [Structured Outputs](https://openrouter.ai/docs/guides/features/structured-outputs)。
 
 實驗工具：`npm.cmd run experiment -- matrix configs/experimental.json` 產生12組可配置對照檔（不呼叫API）；`npm.cmd run experiment -- report DATABASE SESSION_ID` 輸出不含私訊內文的客觀指標。Chrome UI檢查：`npm.cmd run test:browser`；必要時設定BROWSER_PATH。詳見docs/T8_PROGRESS.md。

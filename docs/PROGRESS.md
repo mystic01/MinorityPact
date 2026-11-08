@@ -1,5 +1,9 @@
 # 實作進度 — 2026-11-08
 
+本次再次暫停：唯讀查詢games.sqlite，最新局ce3b730a已前進到logicalTimeMs=5000，未完成者改為B（Qwen3.8Flash）；HTTP200、finish_reason=length，4096 completion tokens全部為reasoning，其餘A/C/D/E均已成功。上次GLM修正後E已能產生決策，但Qwen仍沿用未限制的推理預設。本次將Qwen3.8Flash納入未顯式設定reasoning時的low預設，於modelForSeat解析時生效，適用恢復舊局；不改寫資料庫設定、快照、原始稽核或成功結果，不提高4096上限。官方參數說明：https://openrouter.ai/docs/guides/best-practices/reasoning-tokens 。低推理是降低截斷風險的設定，並非保證供應商不截斷；未以付費API驗證。
+
+驗證：typecheck、web:check與98項離線測試全部通過。新增保存舊局後的Qwen解析回歸，確認low預設、保留4096、其他席不受影響、顯式effort／推理token設定優先、原始設定無修改；既有截斷單次停止／成功席保留測試亦通過。README新增SQLite明文稽核表位置與唯讀查詢方式。下一步：使用者在原服務終端按Ctrl+C，執行npm.cmd start後重新整理頁面，手動按繼續對局；只重試尚未成功的B。未自動重啟服務或恢復付費對局。
+
 頭像素材完成：A–E各中性／發言／微笑／疑惑／驚訝，共25張1254×1254獨立透明PNG，web/public/avatars；附manifest、完整prompt集合、原始提案與docs/avatar-gallery.html預覽。內建image_gen製作，未接入遊戲UI、未加入人設。assets:check通過25圖透明／尺寸／不重複驗證，瀏覽器確認25圖全部載入並目視檢查；typecheck、web:check、build及97項離線測試通過。遊戲API未呼叫。對局截斷修復已另推送98830ba，須重啟服務後由使用者決定是否恢復。
 
 截斷修復驗證：97項離線測試、typecheck、web:check、build及scripted Chrome QA全部通過；測試確認token額度耗盡只嘗試一次、保留另外四席結果，GLM低推理預設不覆蓋使用者顯式設定。不呼叫付費API，服務須重啟後載入。

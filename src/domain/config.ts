@@ -61,7 +61,8 @@ export function modelForSeat(config: SessionConfig, id: string): SessionConfig['
   const seat = config.seatModels?.[id];
   const model = seat?.model ?? config.llm.model;
   const parameters = structuredClone(config.llm.parameters);
-  // GLM 5.3 defaults to max reasoning upstream; keep a bounded output budget usable.
-  if (/^z-ai\/glm-5\.3(?:-flash)?$/.test(model) && parameters.reasoning === undefined) parameters.reasoning = { effort: 'low' };
+  // These reasoning models have exhausted the entire output budget without final JSON.
+  // Apply at resolution time so saved sessions also benefit, without rewriting their config.
+  if ((/^z-ai\/glm-5\.3(?:-flash)?$/.test(model) || model === 'qwen/qwen3.8-flash') && parameters.reasoning === undefined) parameters.reasoning = { effort: 'low' };
   return { ...config.llm, ...(seat ? { model: seat.model, displayName: seat.displayName ?? seat.model } : {}), parameters };
 }

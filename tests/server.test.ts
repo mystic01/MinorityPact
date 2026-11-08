@@ -21,6 +21,24 @@ test('GLM uses low reasoning by default while explicit user reasoning is preserv
   assert.deepEqual(modelForSeat(c, 'E').parameters.reasoning, { effort: 'high' });
   assert.equal(modelForSeat(c, 'E').parameters.max_tokens, 4096);
 });
+
+test('saved Qwen sessions resolve low reasoning without mutating config or other seats', () => {
+  const c = config(); const original = structuredClone(c);
+  const store = new SqliteEventStore(':memory:');
+  try {
+    store.createSession('qwen', c);
+    const saved = store.getConfig('qwen');
+    assert.deepEqual(modelForSeat(saved, 'B').parameters.reasoning, { effort: 'low' });
+    assert.equal(modelForSeat(saved, 'B').parameters.max_tokens, 4096);
+    assert.equal(modelForSeat(saved, 'D').parameters.reasoning, undefined);
+    assert.deepEqual(saved, original);
+    assert.deepEqual(store.getConfig('qwen'), original);
+    for (const reasoning of [{ effort: 'high' }, { max_tokens: 1024 }]) {
+      saved.llm.parameters.reasoning = reasoning;
+      assert.deepEqual(modelForSeat(saved, 'B').parameters.reasoning, reasoning);
+    }
+  } finally { store.close(); }
+});
 test('local HTTP operations enforce origin/token; public snapshots/SSE do not disclose secrets', async () => {
   const store = new SqliteEventStore(':memory:'); store.createSession('s', config());
   await store.commitBatch({ sessionId: 's', batchId: 'b', expectedVersion: 0, checkpoint: { logicalTimeMs: 0, subscriptions: {}, pendingActions: [], pendingDecisions: [] }, events: [{ eventId: 'e1', sessionId: 's', round: 1, phase: 'negotiation', schemaVersion: 1, batchId: 'b', commitSeq: 1, logicalTimeMs: 0, data: { type: 'private_message_sent', actorId: 'A', recipientId: 'B', body: 'SECRET_SENTINEL', logicalTimeMs: 0, batchId: 'b' } }] });
