@@ -10,7 +10,7 @@
   "scoring": { "policy": "exclusive", "solo": 5, "pair": 2, "majority": 0 },
   "policies": { "ready": "revocable_quiet_batch", "vote": "commit_once", "simultaneous": "next_batch", "messageTiming": "immediate" },
   "scheduling": { "mode": "fixed_5s", "eventReactionMs": 1000 },
-  "llm": { "provider": "openrouter", "model": "z-ai/glm-5.3-flash", "displayName": "GLM 5.3 Flash", "parameters": { "max_tokens": 4096 } },
+  "llm": { "provider": "openrouter", "model": "z-ai/glm-5.3-flash", "displayName": "GLM 5.3 Flash", "parameters": { "max_tokens": 8192 } },
   "seatModels": {
     "A": { "model": "z-ai/glm-5.3-flash", "displayName": "GLM 5.3 Flash" },
     "B": { "model": "qwen/qwen3.8-flash", "displayName": "Qwen3.8 Flash" },

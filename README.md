@@ -38,7 +38,7 @@ npm.cmd run game -- start configs/local.json data/games.sqlite
 npm.cmd run game -- resume configs/local.json data/games.sqlite SESSION_ID
 ```
 
-`check` 不發送 API 請求，`start/resume` 會呼叫付費模型。resume 使用資料庫中原始模型／規則，修改設定只影響新局。CLI 只印公開投影；私訊原文、策略與原始 provider 回應在 SQLite 私有資料內，勿直接分享資料庫。
+`check` 不發送 API 請求，`start/resume` 會呼叫付費模型。resume 使用資料庫中原始模型／規則。例外是單次輸出上限：啟動設定的 `llm.parameters.max_tokens` 作為執行時下限，與保存值取較大者，讓暫停的舊局也能提高額度；不改寫歷史設定或已完成決策。預設已由4096提高為8192，重新啟動服務後生效，推理強度不變；較高上限可能增加實際用量與等待，並非保證不再截斷。CLI 只印公開投影；私訊原文、策略與原始 provider 回應在 SQLite 私有資料內，勿直接分享資料庫。
 
 CLI 依真實時間等待邏輯時間間隔，LLM 推理期間停鐘。失敗最多重試 2 次後保留 pending decisions，退出並允許 resume。資料庫旁 `.lock` 防止兩個 CLI 同時執行；若程序被強制終止留下 lock，確認沒有對局程序仍執行後再手動移除 lock。不要同時以其他程式寫入同一資料庫。
 

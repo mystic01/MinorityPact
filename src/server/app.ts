@@ -42,7 +42,7 @@ export function createApp(options: AppOptions) {
     if (active || states.get(id) === 'aborted') throw new Error('Unavailable');
     const config = store.getConfig(id);
     if (!options.controllers && !options.apiKey) throw new Error('Missing key');
-    const controllers = options.controllers?.(config, id) ?? Object.fromEntries(config.players.map(agent => [agent, new OpenRouterController(modelForSeat(config, agent), options.apiKey!, (snapshot, record) => store.recordAudit(id, snapshot, record))]));
+    const controllers = options.controllers?.(config, id) ?? Object.fromEntries(config.players.map(agent => [agent, new OpenRouterController(modelForSeat(config, agent, typeof options.config.llm.parameters.max_tokens === 'number' ? options.config.llm.parameters.max_tokens : undefined), options.apiKey!, (snapshot, record) => store.recordAudit(id, snapshot, record))]));
     active = id; states.set(id, 'running');
     const c = new DecisionCoordinator(store, id, controllers);
     void (async () => {

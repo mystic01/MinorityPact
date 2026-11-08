@@ -1,5 +1,7 @@
 # 實作進度 — 2026-11-08
 
+提高單次輸出上限：依使用者指示將experimental共用max_tokens從4096提高為8192，保留GLM low及Qwen 1024推理設定。Web與CLI建立控制器時，以啟動設定的max_tokens作為執行時下限，與舊局保存上限取較大者，因此重啟服務後恢復目前暫停局也能使用8192；不降低原本更高設定，不改寫模型、遊戲規則、資料庫設定、快照或成功決策。README已說明此恢復例外。typecheck、web:check、112項離線測試全數通過，新增舊局提高上限、不回寫設定、不降低較高值及保留推理配置測試。未修改UI，未呼叫付費API、未恢復對局。下一步：停止原服務後npm.cmd start，重新整理再手動繼續；目前成功席不重叫。提高上限可減少截斷風險但尚未經真實模型驗證，也不處理事件引用錯誤或HTTP402，仍可能增加單次費用與等待時間。
+
 真人模式方向與截斷調查（僅文件／唯讀）：已將「真人提交後推進五秒窗口、同批AI結果暫存、提交與準備投票分開」寫入REQUIREMENT第23節，尚未實作。最新局282227ee於第3回合累計70000ms暫停，唯一未完成者E（z-ai/glm-5.3），A/B/C成功結果已保存，D本批未喚醒。audit440為HTTP200、finish_reason=length：max_tokens4096、reasoning.effort=low，completion_tokens4096，其中reasoning_tokens2850，content789字元；prompt_tokens38451。這是輸出預算耗盡，low不是固定推理token上限，不能保證留足完整JSON所需額度。此前同快照audit434曾完整輸出但被Unknown observed event拒絕，隨後audit436 HTTP402表示當時餘額與進行中請求的額度預留不足；這兩者與本次截斷是不同問題，不推斷目前帳戶餘額。未修改程式／模型參數、未重試API、未恢復對局。下一步待使用者決定是否修改各席輸出預算與精簡回覆／事件引用規則，再另行離線驗證；目前不自動套用。
 
 當批訊息與90秒交涉已完成：新局experimental預設negotiationTimeMs=90000，rulesVersion=minority-pact-v2-immediate、promptVersion=v3-zh-TW-immediate，policies.messageTiming=immediate。公開與私人訊息在動態JSON schema及coordinator驗證均限制scheduledTimeMs等於當前邏輯時間；欲延後表態可預約nextWake，再以最新授權快照思考。保留自行沉默、停止訂閱及原ready邏輯，不強制D或其他席發言。舊局未指定messageTiming時保留scheduled規則及待送訊息，不回寫資料庫。

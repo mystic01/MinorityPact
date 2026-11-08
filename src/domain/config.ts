@@ -56,11 +56,18 @@ export function parseConfig(value: unknown): SessionConfig {
     llm: { provider: oneOf(l.provider, ['openrouter']), model: text(l.model), parameters: structuredClone(parameters), ...(l.displayName === undefined ? {} : { displayName: text(l.displayName) }) },
   };
 }
-export function modelForSeat(config: SessionConfig, id: string): SessionConfig['llm'] {
+export function modelForSeat(config: SessionConfig, id: string, outputTokenFloor?: number): SessionConfig['llm'] {
   if (!config.players.includes(id)) throw new Error('Unknown seat');
   const seat = config.seatModels?.[id];
   const model = seat?.model ?? config.llm.model;
   const parameters = structuredClone(config.llm.parameters);
+  // Live deployment may raise a saved session's output allowance without changing
+  // its frozen rules, model, snapshots or existing successful decisions.
+  if (outputTokenFloor !== undefined) {
+    integer(outputTokenFloor, 1);
+    const savedLimit = parameters.max_tokens;
+    parameters.max_tokens = Math.max(typeof savedLimit === 'number' ? savedLimit : 0, outputTokenFloor);
+  }
   // These reasoning models have exhausted the entire output budget without final JSON.
   // Apply at resolution time so saved sessions also benefit, without rewriting their config.
   if (parameters.reasoning === undefined) {

@@ -10,6 +10,26 @@ import { DecisionCoordinator } from '../src/application/coordinator.ts';
 import { ProviderDecisionError } from '../src/controllers/openrouter.ts';
 import type { DecisionInput, DecisionResult } from '../src/contracts/decision.ts';
 const config = () => parseConfig(JSON.parse(readFileSync(new URL('../configs/experimental.json', import.meta.url), 'utf8')));
+
+test('runtime output floor raises saved allowance without changing models, reasoning or persisted config', () => {
+  const c = config(); c.llm.parameters.max_tokens = 4096;
+  const original = structuredClone(c);
+  const store = new SqliteEventStore(':memory:');
+  try {
+    store.createSession('limits', c);
+    const saved = store.getConfig('limits');
+    const resolved = modelForSeat(saved, 'E', 8192);
+    assert.equal(resolved.parameters.max_tokens, 8192);
+    assert.equal(resolved.model, c.seatModels!.E!.model);
+    assert.deepEqual(resolved.parameters.reasoning, { effort: 'low' });
+    assert.equal(modelForSeat(saved, 'E').parameters.max_tokens, 4096);
+    assert.equal(modelForSeat(saved, 'E', 2048).parameters.max_tokens, 4096);
+    assert.deepEqual(modelForSeat(saved, 'B', 8192).parameters.reasoning, { max_tokens: 1024 });
+    assert.deepEqual(saved, original);
+    assert.deepEqual(store.getConfig('limits'), original);
+    assert.throws(() => modelForSeat(saved, 'E', -1));
+  } finally { store.close(); }
+});
 test('five seat models are distinct, configurable, and frozen per saved session', () => {
   const c = config(); assert.equal(new Set(c.players.map(id => modelForSeat(c, id).model)).size, 5);
   const store = new SqliteEventStore(':memory:');
@@ -21,7 +41,7 @@ test('GLM uses low reasoning by default while explicit user reasoning is preserv
   assert.deepEqual(modelForSeat(c, 'E').parameters.reasoning, { effort: 'low' });
   c.llm.parameters.reasoning = { effort: 'high' };
   assert.deepEqual(modelForSeat(c, 'E').parameters.reasoning, { effort: 'high' });
-  assert.equal(modelForSeat(c, 'E').parameters.max_tokens, 4096);
+  assert.equal(modelForSeat(c, 'E').parameters.max_tokens, 8192);
 });
 
 test('paused HTTP/SSE reports the unresolved rate limit instead of a resolved peers later rejection', async () => {
@@ -48,7 +68,7 @@ test('paused HTTP/SSE reports the unresolved rate limit instead of a resolved pe
 });
 
 test('saved Qwen sessions resolve a numeric reasoning budget without mutating config or other seats', () => {
-  const c = config(); const original = structuredClone(c);
+  const c = config(); c.llm.parameters.max_tokens = 4096; const original = structuredClone(c);
   const store = new SqliteEventStore(':memory:');
   try {
     store.createSession('qwen', c);

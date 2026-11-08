@@ -23,9 +23,9 @@ async function main(): Promise<void> {
     store = new SqliteEventStore(database);
     const id = givenId ?? randomUUID();
     if (command === 'start') store.createSession(id, config);
-    const actual = store.getConfig(id); // Resume always uses frozen session settings.
+    const actual = store.getConfig(id); // Rules and models remain frozen; the supplied config may raise output allowance.
     const activeStore = store;
-    const controllers = Object.fromEntries(actual.players.map(agent => [agent, new OpenRouterController(modelForSeat(actual, agent), key, (snapshot, audit) => activeStore.recordAudit(id, snapshot, audit))]));
+    const controllers = Object.fromEntries(actual.players.map(agent => [agent, new OpenRouterController(modelForSeat(actual, agent, typeof config.llm.parameters.max_tokens === 'number' ? config.llm.parameters.max_tokens : undefined), key, (snapshot, audit) => activeStore.recordAudit(id, snapshot, audit))]));
     const coordinator = new DecisionCoordinator(store, id, controllers);
     const replay = new ReplayService(store); let after = 0;
     console.log(`Session ${id} · OpenRouter · ${actual.llm.displayName ?? actual.llm.model}`);
