@@ -1,6 +1,8 @@
 # Minority Pact
 
-目前實作 T1/T2 核心及 T3 SQLite 儲存、權限投影與重播服務。需要 Node.js 24 以上。
+本機多模型博弈控制台，含公開即時觀戰與終局全知重播。需要 Node.js 24 以上。
+
+啟動：`npm.cmd start`，開啟 http://127.0.0.1:3000。預設五席使用不同 Gemini；設定存於 configs/experimental.json 的 seatModels，可在建立新局前於畫面調整。真實執行需要本機 .env 的 OPENROUTER_API_KEY。每局設定凍結，歷史重播顯示當局模型。server 預設採 experimental.json；可設定 GAME_CONFIG 指向其他檔案。
 
 ```powershell
 npm.cmd install
@@ -10,7 +12,7 @@ npm.cmd test
 
 Node 原生執行 TypeScript 測試，不需測試框架或 API key。TypeScript 靜態檢查仍需安裝 devDependencies。
 
-`configs/experimental.json` 是實驗範本；`llm.model` 留空，必須自行填入 OpenRouter 模型 ID 才能通過設定驗證。五席共用 `llm`，不支援個別模型覆寫。API key 日後從 `OPENROUTER_API_KEY` 讀取（見 `.env.example`）；目前沒有 LLM 呼叫或自動載入 `.env` 的執行器。
+`configs/experimental.json` 已提供五個不同 Gemini 模型 ID。`llm` 保存共用參數及未指定 seatModels 時的預設；seatModels 可逐席覆寫模型。API key 從 OPENROUTER_API_KEY 讀取（見 .env.example），不傳入瀏覽器。
 
 `parseConfig(unknown)` 與 `parseDecision(unknown)` 是 runtime 驗證入口。規則引擎接收已驗證設定；`resolveBatch` 只接當下到期行動，未來 action、批次 ID 冪等與快照由 T3/T4 負責。回傳事件以 `reduce` 套用到新狀態；輸入不被修改。reveal 後以空批次推進下一回合或終局，便於後續觀戰呈現揭曉階段。
 
@@ -20,7 +22,7 @@ Node 原生執行 TypeScript 測試，不需測試框架或 API key。TypeScript
 
 ## OpenRouter 命令列對局
 
-複製 `configs/experimental.json` 為 `configs/local.json`，填入 `llm.model` 的完整 OpenRouter 模型 ID，可選填 `displayName`。模型需支援 JSON Schema 結構化輸出與設定中的參數；不支援時會暫停，不自動換模型。五席使用同一設定；推理模型可在共同 parameters.reasoning 設定資源。
+可複製 `configs/experimental.json` 為 `configs/local.json`，調整 seatModels 的 OpenRouter 模型 ID／displayName。模型需支援 JSON Schema 結構化輸出與共同參數；不支援時會暫停，不自動換模型。推理資源可在 parameters.reasoning 設定。
 
 ```powershell
 Copy-Item configs/experimental.json configs/local.json

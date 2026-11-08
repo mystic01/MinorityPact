@@ -13,7 +13,7 @@ const ids = ['A', 'B', 'C', 'D', 'E'];
 const apply = (s: GameState, actions: Batch['actions'] = [], time = s.logicalTimeMs): GameState => resolveBatch(s, { batchId: 'test', logicalTimeMs: time, actions, hasPendingMessages: false }).reduce(reduce, s);
 const action = (actorId: string, a: Action) => ({ actorId, action: a });
 test('configuration rejects empty model, missing rules, duplicate/unequal seats and secrets', () => {
-  assert.throws(() => parseConfig(raw()));
+  assert.throws(() => parseConfig({ ...raw(), llm: { ...raw().llm, model: '' } }));
   const c = config(); assert.equal(c.llm.model, 'test/model');
   for (const field of ['rounds', 'policies', 'scoring', 'negotiationTimeMs']) { const v = { ...c }; delete (v as Record<string, unknown>)[field]; assert.throws(() => parseConfig(v)); }
   assert.throws(() => parseConfig({ ...c, players: ['A', 'A', 'C', 'D', 'E'] }));

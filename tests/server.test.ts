@@ -1,0 +1,59 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { once } from 'node:events';
+import type { AddressInfo } from 'node:net';
+import { parseConfig, modelForSeat } from '../src/domain/config.ts';
+import { SqliteEventStore } from '../src/infrastructure/sqlite-store.ts';
+import { createApp } from '../src/server/app.ts';
+import type { DecisionInput, DecisionResult } from '../src/contracts/decision.ts';
+const config = () => parseConfig(JSON.parse(readFileSync(new URL('../configs/experimental.json', import.meta.url), 'utf8')));
+test('five seat models are distinct, configurable, and frozen per saved session', () => {
+  const c = config(); assert.equal(new Set(c.players.map(id => modelForSeat(c, id).model)).size, 5);
+  const store = new SqliteEventStore(':memory:');
+  try { store.createSession('s', c); c.seatModels!.A!.model = 'changed'; assert.notEqual(modelForSeat(store.getConfig('s'), 'A').model, 'changed'); }
+  finally { store.close(); }
+});
+test('local HTTP operations enforce origin/token; public snapshots/SSE do not disclose secrets', async () => {
+  const store = new SqliteEventStore(':memory:'); store.createSession('s', config());
+  await store.commitBatch({ sessionId: 's', batchId: 'b', expectedVersion: 0, checkpoint: { logicalTimeMs: 0, subscriptions: {}, pendingActions: [], pendingDecisions: [] }, events: [{ eventId: 'e1', sessionId: 's', round: 1, phase: 'negotiation', schemaVersion: 1, batchId: 'b', commitSeq: 1, logicalTimeMs: 0, data: { type: 'private_message_sent', actorId: 'A', recipientId: 'B', body: 'SECRET_SENTINEL', logicalTimeMs: 0, batchId: 'b' } }] });
+  const app = createApp({ store, config: config(), apiKey: 'KEY_SENTINEL' }); app.server.listen(0, '127.0.0.1'); await once(app.server, 'listening');
+  const root = `http://127.0.0.1:${(app.server.address() as AddressInfo).port}`;
+  try {
+    assert.equal((await fetch(`${root}/api/bootstrap`, { headers: { Origin: 'https://evil.test' } })).status, 403);
+    const bootstrap = await (await fetch(`${root}/api/bootstrap`)).json() as { token: string };
+    assert.ok(!JSON.stringify(bootstrap).includes('KEY_SENTINEL'));
+    assert.equal((await fetch(`${root}/api/sessions`, { method: 'POST' })).status, 403);
+    const created = await fetch(`${root}/api/sessions`, { method: 'POST', headers: { 'X-Operation-Token': bootstrap.token }, body: JSON.stringify(config()) }); assert.equal(created.status, 201);
+    for (const path of ['/api/sessions/s', '/api/sessions/s/events?after=0', '/api/sessions/s?role=admin&agentId=A']) assert.ok(!(await (await fetch(root + path)).text()).includes('SECRET_SENTINEL'));
+    assert.equal((await fetch(`${root}/api/sessions/s/replay?view=omniscient`)).status, 400);
+    const controller = new AbortController();
+    const stream = await fetch(`${root}/api/sessions/s/stream?view=omniscient`, { signal: controller.signal });
+    const reader = stream.body!.getReader(); const first = new TextDecoder().decode((await reader.read()).value);
+    assert.ok(first.includes('id: 1')); assert.ok(!first.includes('SECRET_SENTINEL')); controller.abort();
+    const reconnect = new AbortController(); const second = await fetch(`${root}/api/sessions/s/stream`, { headers: { 'Last-Event-ID': '1' }, signal: reconnect.signal });
+    const chunk = new TextDecoder().decode((await second.body!.getReader().read()).value); assert.ok(chunk.includes('"events":[]')); reconnect.abort();
+  } finally { app.stop(); store.close(); }
+});
+test('HTTP starts scripted controllers, completes, unlocks exact replay and keeps live stream public', async () => {
+  const store = new SqliteEventStore(':memory:'); store.createSession('s', config());
+  const app = createApp({ store, config: config(), pace: async () => {}, controllers: c => Object.fromEntries(c.players.map(id => [id, { decide: async (i: DecisionInput): Promise<DecisionResult> => ({
+    actions: i.phase === 'commit' ? [{ type: 'vote', actionId: 'v', color: i.agentId === 'A' ? 'red' : 'blue', scheduledTimeMs: i.logicalTimeMs }] : [], nextWake: { onEvents: [] }, strategyNote: { goal: 'win', plan: 'PRIVATE_PLAN', whyThisAction: 'observe', predictedOutcome: 'unknown', observedEventIds: [] },
+  }) }])) }); app.server.listen(0, '127.0.0.1'); await once(app.server, 'listening');
+  const root = `http://127.0.0.1:${(app.server.address() as AddressInfo).port}`;
+  try {
+    const { token } = await (await fetch(`${root}/api/bootstrap`)).json() as { token: string };
+    assert.equal((await fetch(`${root}/api/sessions/s/start`, { method: 'POST', headers: { 'X-Operation-Token': token } })).status, 200);
+    let done = false;
+    for (let n = 0; n < 100; n++) {
+      const live = await (await fetch(`${root}/api/sessions/s`)).json() as { state: { phase: string } };
+      assert.ok(!JSON.stringify(live).includes('PRIVATE_PLAN'));
+      if (live.state.phase === 'completed') { done = true; break; }
+      await new Promise(r => setTimeout(r, 10));
+    }
+    assert.ok(done);
+    const full = await (await fetch(`${root}/api/sessions/s/replay?view=omniscient`)).text(); assert.ok(full.includes('PRIVATE_PLAN'));
+    const early = await (await fetch(`${root}/api/sessions/s/replay?view=omniscient&through=0`)).json() as { state: { standings: { score: number }[] }; events: unknown[] };
+    assert.equal(early.events.length, 0); assert.ok(early.state.standings.every(s => s.score === 0));
+  } finally { app.stop(); store.close(); }
+});

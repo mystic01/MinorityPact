@@ -8,10 +8,11 @@ export interface SessionConfig extends Rules {
   schemaVersion: 1; experimental: true; rulesVersion: string; promptVersion: string; seed: string;
   scheduling: { mode: 'fixed_5s' | 'fixed_15s' | 'event_driven'; eventReactionMs: number };
   llm: { provider: 'openrouter'; model: string; displayName?: string; parameters: Record<string, unknown> };
+  seatModels?: Record<string, { model: string; displayName?: string }>;
 }
 export function parseConfig(value: unknown): SessionConfig {
   const v = object(value);
-  keys(v, ['schemaVersion', 'experimental', 'rulesVersion', 'promptVersion', 'seed', 'players', 'rounds', 'negotiationTimeMs', 'scoring', 'policies', 'scheduling', 'llm']);
+  keys(v, ['schemaVersion', 'experimental', 'rulesVersion', 'promptVersion', 'seed', 'players', 'rounds', 'negotiationTimeMs', 'scoring', 'policies', 'scheduling', 'llm', 'seatModels']);
   if (v.schemaVersion !== 1 || v.experimental !== true) throw new Error('Expected experimental schema v1');
   const players = array(v.players).map(text);
   if (players.length !== 5 || new Set(players).size !== 5 || players.some(id => !/^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(id) || ['__proto__', 'constructor', 'prototype'].includes(id))) throw new Error('Exactly five distinct safe seat IDs required');
@@ -38,11 +39,25 @@ export function parseConfig(value: unknown): SessionConfig {
     if (reasoning.effort !== undefined) oneOf(reasoning.effort, ['none', 'minimal', 'low', 'medium', 'high', 'xhigh']);
     if (reasoning.max_tokens !== undefined) integer(reasoning.max_tokens, 1);
   }
+  let seatModels: SessionConfig['seatModels'];
+  if (v.seatModels !== undefined) {
+    const seats = object(v.seatModels); keys(seats, players);
+    seatModels = Object.fromEntries(players.map(id => {
+      const seat = object(seats[id]); keys(seat, ['model', 'displayName']);
+      return [id, { model: text(seat.model), ...(seat.displayName === undefined ? {} : { displayName: text(seat.displayName) }) }];
+    }));
+  }
   return {
+    ...(seatModels === undefined ? {} : { seatModels }),
     schemaVersion: 1, experimental: true, players, rounds, negotiationTimeMs: integer(v.negotiationTimeMs, 1),
     rulesVersion: text(v.rulesVersion), promptVersion: text(v.promptVersion), seed: text(v.seed), scoring,
     policies: { ready: oneOf(p.ready, ['revocable_quiet_batch']), vote: oneOf(p.vote, ['commit_once']), simultaneous: oneOf(p.simultaneous, ['next_batch']) },
     scheduling: { mode: oneOf(t.mode, ['fixed_5s', 'fixed_15s', 'event_driven']), eventReactionMs: integer(t.eventReactionMs, 1) },
     llm: { provider: oneOf(l.provider, ['openrouter']), model: text(l.model), parameters: structuredClone(parameters), ...(l.displayName === undefined ? {} : { displayName: text(l.displayName) }) },
   };
+}
+export function modelForSeat(config: SessionConfig, id: string): SessionConfig['llm'] {
+  if (!config.players.includes(id)) throw new Error('Unknown seat');
+  const seat = config.seatModels?.[id];
+  return { ...config.llm, ...(seat ? { model: seat.model, displayName: seat.displayName ?? seat.model } : {}), parameters: structuredClone(config.llm.parameters) };
 }

@@ -1,5 +1,7 @@
 # 實作進度 — 2026-11-08
 
+最新 T6：本機 Vue 控制台／HTTP／SSE 已建立，五席不同 Gemini 預設已接線（使用者最新需求），88項測試、前後端型別與build通過。見 T6_PROGRESS.md。已偵測本機key，下一步真實smoke及T7/T8；不輸出憑證。
+
 最新 T5：OpenRouter adapter、CLI 與原始輸出稽核已實作；型別檢查與85項 mock/scripted 測試通過。真正五 LLM 對局尚缺模型ID／本機key，T5完整驗收未完成。詳見 [T5_PROGRESS.md](T5_PROGRESS.md)。
 
 最新 T4：型別檢查已通過，81 項 scripted 測試；套件與 Git 環境阻礙已解除。T1–T3 已推送 2c9ccf3，T4 詳見 [T4_PROGRESS.md](T4_PROGRESS.md)。下一步 T5 OpenRouter 與 CLI。下方為歷史紀錄，先前「安裝／型別／push 未成功」已被本次解決。

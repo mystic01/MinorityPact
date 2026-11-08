@@ -2,7 +2,7 @@ import { readFileSync, mkdirSync, openSync, closeSync, unlinkSync } from 'node:f
 import { dirname, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { setTimeout } from 'node:timers/promises';
-import { parseConfig } from './domain/config.ts';
+import { parseConfig, modelForSeat } from './domain/config.ts';
 import { SqliteEventStore } from './infrastructure/sqlite-store.ts';
 import { OpenRouterController } from './controllers/openrouter.ts';
 import { DecisionCoordinator } from './application/coordinator.ts';
@@ -25,7 +25,7 @@ async function main(): Promise<void> {
     if (command === 'start') store.createSession(id, config);
     const actual = store.getConfig(id); // Resume always uses frozen session settings.
     const activeStore = store;
-    const controllers = Object.fromEntries(actual.players.map(agent => [agent, new OpenRouterController(actual.llm, key, (snapshot, audit) => activeStore.recordAudit(id, snapshot, audit))]));
+    const controllers = Object.fromEntries(actual.players.map(agent => [agent, new OpenRouterController(modelForSeat(actual, agent), key, (snapshot, audit) => activeStore.recordAudit(id, snapshot, audit))]));
     const coordinator = new DecisionCoordinator(store, id, controllers);
     const replay = new ReplayService(store); let after = 0;
     console.log(`Session ${id} · OpenRouter · ${actual.llm.displayName ?? actual.llm.model}`);

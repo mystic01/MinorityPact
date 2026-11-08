@@ -34,6 +34,8 @@ export function projectEvent(e: StoredEvent, viewer: Viewer): PublicEvent | null
 }
 export function publicView(state: GameState, config: SessionConfig): PublicView {
   return { sessionId: state.sessionId, round: state.round, phase: state.phase, logicalTimeMs: state.logicalTimeMs,
+    rounds: config.rounds, negotiationTimeMs: config.negotiationTimeMs, roundStartedMs: state.roundStartedMs,
+    ...(config.seatModels ? { seatModels: structuredClone(config.seatModels) } : {}),
     standings: structuredClone(state.standings), model: { provider: config.llm.provider, model: config.llm.model,
       ...(config.llm.displayName === undefined ? {} : { displayName: config.llm.displayName }) } };
 }

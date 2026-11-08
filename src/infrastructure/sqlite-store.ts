@@ -12,6 +12,7 @@ export class SqliteEventStore implements EventStore {
     this.db.exec(`PRAGMA foreign_keys=ON;
       PRAGMA journal_mode=WAL;
       CREATE TABLE IF NOT EXISTS migrations(version INTEGER PRIMARY KEY);
+      CREATE TABLE IF NOT EXISTS session_runtime(session_id TEXT PRIMARY KEY REFERENCES sessions(id), status TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS decision_audit(id INTEGER PRIMARY KEY, session_id TEXT NOT NULL REFERENCES sessions(id), snapshot_id TEXT NOT NULL, record TEXT NOT NULL);
       CREATE TRIGGER IF NOT EXISTS audit_no_update BEFORE UPDATE ON decision_audit BEGIN SELECT RAISE(ABORT,'append-only audit'); END;
       CREATE TRIGGER IF NOT EXISTS audit_no_delete BEFORE DELETE ON decision_audit BEGIN SELECT RAISE(ABORT,'append-only audit'); END;
@@ -24,6 +25,9 @@ export class SqliteEventStore implements EventStore {
       INSERT OR IGNORE INTO migrations VALUES(2);`);
   }
   close(): void { this.db.close(); }
+  setStatus(id: string, status: string): void { this.db.prepare('INSERT INTO session_runtime VALUES(?,?) ON CONFLICT(session_id) DO UPDATE SET status=excluded.status').run(id, status); }
+  getStatus(id: string): string { return String(this.db.prepare('SELECT status FROM session_runtime WHERE session_id=?').get(id)?.status ?? 'idle'); }
+  listSessions(): string[] { return this.db.prepare('SELECT id FROM sessions ORDER BY rowid DESC').all().map(row => String(row.id)); }
   recordAudit(sessionId: string, snapshotId: string, record: Record<string, unknown>): void {
     this.db.prepare('INSERT INTO decision_audit(session_id,snapshot_id,record) VALUES(?,?,?)').run(sessionId, snapshotId, JSON.stringify(record));
   }

@@ -3,11 +3,26 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=24" },
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "node --test tests/*.test.ts",
-    "game": "node --env-file-if-exists=.env src/cli.ts"
+    "game": "node --env-file-if-exists=.env src/cli.ts",
+    "web:check": "vue-tsc --noEmit -p web/tsconfig.json",
+    "build": "vite build",
+    "serve": "node --env-file-if-exists=.env src/server/main.ts",
+    "start": "npm run build && npm run serve"
   },
-  "devDependencies": { "typescript": "5.9.3", "@types/node": "24.10.1" }
+  "devDependencies": {
+    "@types/node": "24.10.1",
+    "@vitejs/plugin-vue": "^6.0.10",
+    "typescript": "5.9.3",
+    "vite": "^8.3.6",
+    "vue-tsc": "^3.3.14"
+  },
+  "dependencies": {
+    "vue": "^3.5.45"
+  }
 }

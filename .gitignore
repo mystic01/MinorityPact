@@ -4,3 +4,4 @@ data/
 coverage/
 .npm-cache/
 configs/local.json
+dist/

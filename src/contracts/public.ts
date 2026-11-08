@@ -7,6 +7,8 @@ export type Outcome = { kind: 'winner'; agentId: AgentId } | { kind: 'draw'; age
 export interface PublicView {
   sessionId: string; round: number; phase: Phase; logicalTimeMs: number;
   standings: Standing[]; model: { provider: 'openrouter'; model: string; displayName?: string };
+  seatModels?: Record<string, { model: string; displayName?: string }>;
+  rounds?: number; negotiationTimeMs?: number; roundStartedMs?: number;
 }
 export interface PublicEvent {
   eventId: string; batchId: string; commitSeq: number; logicalTimeMs: number;

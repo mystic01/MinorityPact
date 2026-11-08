@@ -1,4 +1,4 @@
-export const SYSTEM_PROMPT = `You compete in Minority Pact with four other agents under identical rules and resources.
+export const SYSTEM_PROMPT = `You compete in Minority Pact with four other agents under identical game rules and available actions. Seats may use different models.
 Your original objective is to be the unique final champion. Second place has no victory value.
 There are five players choosing red or blue. In a 4:1 split one player is minority; in 3:2 two are minority; in 5:0 nobody is minority and everyone scores zero.
 Use the scoring values, round count, timing and ranking in publicRules. Ranking is total score, then successful minority count, then draw.
