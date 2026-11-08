@@ -38,7 +38,7 @@ npm.cmd run game -- resume configs/local.json data/games.sqlite SESSION_ID
 
 CLI 依真實時間等待邏輯時間間隔，LLM 推理期間停鐘。失敗最多重試 2 次後保留 pending decisions，退出並允許 resume。資料庫旁 `.lock` 防止兩個 CLI 同時執行；若程序被強制終止留下 lock，確認沒有對局程序仍執行後再手動移除 lock。不要同時以其他程式寫入同一資料庫。
 
-GLM 5.3／Flash 與 Qwen3.8 Flash 在未指定 `llm.parameters.reasoning` 時採 `{"effort":"low"}`，避免推理吃完輸出預算而沒有決策 JSON；明確設定會優先保留。此預設於載入席位時套用，因此重啟後恢復舊局也適用，不改寫原始設定或成功決策。低推理仍可能截斷；截斷會停止自動重試，需手動處理後再繼續，不自動提高費用上限。
+未指定 `llm.parameters.reasoning` 時，GLM 5.3／Flash 採 `{"effort":"low"}`；Qwen3.8 Flash 採 `{"max_tokens":1024}`，限制推理用量（總輸出上限仍為4096）。Qwen的low請求曾實際耗盡4096推理token，其[官方模型資料](https://openrouter.ai/api/v1/models)標示支援推理token預算，未標示effort選項。若使用者將總輸出上限調至1024以下，Qwen預設關閉可選推理；明確的reasoning設定優先保留。此預設於載入席位時套用，因此重啟後恢復舊局也適用，不改寫原始設定或成功決策。截斷會停止自動重試，需手動處理後再繼續，不自動提高費用上限。
 
 ## 本機 LLM 呼叫紀錄
 

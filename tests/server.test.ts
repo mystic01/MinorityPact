@@ -22,13 +22,13 @@ test('GLM uses low reasoning by default while explicit user reasoning is preserv
   assert.equal(modelForSeat(c, 'E').parameters.max_tokens, 4096);
 });
 
-test('saved Qwen sessions resolve low reasoning without mutating config or other seats', () => {
+test('saved Qwen sessions resolve a numeric reasoning budget without mutating config or other seats', () => {
   const c = config(); const original = structuredClone(c);
   const store = new SqliteEventStore(':memory:');
   try {
     store.createSession('qwen', c);
     const saved = store.getConfig('qwen');
-    assert.deepEqual(modelForSeat(saved, 'B').parameters.reasoning, { effort: 'low' });
+    assert.deepEqual(modelForSeat(saved, 'B').parameters.reasoning, { max_tokens: 1024 });
     assert.equal(modelForSeat(saved, 'B').parameters.max_tokens, 4096);
     assert.equal(modelForSeat(saved, 'D').parameters.reasoning, undefined);
     assert.deepEqual(saved, original);
@@ -38,6 +38,11 @@ test('saved Qwen sessions resolve low reasoning without mutating config or other
       assert.deepEqual(modelForSeat(saved, 'B').parameters.reasoning, reasoning);
     }
   } finally { store.close(); }
+});
+
+test('Qwen defaults disable optional reasoning when output budget cannot fit 1024 thinking tokens', () => {
+  const c = config(); c.llm.parameters.max_tokens = 512;
+  assert.deepEqual(modelForSeat(c, 'B').parameters.reasoning, { effort: 'none' });
 });
 test('local HTTP operations enforce origin/token; public snapshots/SSE do not disclose secrets', async () => {
   const store = new SqliteEventStore(':memory:'); store.createSession('s', config());

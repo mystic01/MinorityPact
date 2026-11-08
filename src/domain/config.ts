@@ -63,6 +63,16 @@ export function modelForSeat(config: SessionConfig, id: string): SessionConfig['
   const parameters = structuredClone(config.llm.parameters);
   // These reasoning models have exhausted the entire output budget without final JSON.
   // Apply at resolution time so saved sessions also benefit, without rewriting their config.
-  if ((/^z-ai\/glm-5\.3(?:-flash)?$/.test(model) || model === 'qwen/qwen3.8-flash') && parameters.reasoning === undefined) parameters.reasoning = { effort: 'low' };
+  if (parameters.reasoning === undefined) {
+    if (/^z-ai\/glm-5\.3(?:-flash)?$/.test(model)) parameters.reasoning = { effort: 'low' };
+    // Qwen advertises supports_max_tokens, not supported_efforts. A low effort
+    // request still exhausted 4096 reasoning tokens in the local private audit.
+    if (model === 'qwen/qwen3.8-flash') {
+      const total = parameters.max_tokens;
+      parameters.reasoning = typeof total === 'number' && total <= 1024
+        ? { effort: 'none' }
+        : { max_tokens: 1024 };
+    }
+  }
   return { ...config.llm, ...(seat ? { model: seat.model, displayName: seat.displayName ?? seat.model } : {}), parameters };
 }

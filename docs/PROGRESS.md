@@ -1,5 +1,9 @@
 # 實作進度 — 2026-11-08
 
+再次暫停的進一步診斷：ce3b730a仍停5000ms、B未完成，最新Qwen請求已帶reasoning.effort=low卻再次產生4096 reasoning tokens／finish_reason=length。前次low修正不足。唯讀查詢OpenRouter公開免金鑰GET /api/v1/models，Qwen3.8Flash的reasoning為mandatory:false、default_enabled:true、supports_max_tokens:true，未列supported_efforts；GLM5.3則明列max/high/low。依能力改用Qwen預設reasoning.max_tokens=1024，不再假定effort能限制Qwen用量；總max_tokens保持4096。自訂總額<=1024時預設effort:none，以免推理預算等於或超過總額；顯式使用者reasoning保持優先。未改寫既有遊戲／稽核、未呼叫付費生成API。官方參考：https://openrouter.ai/api/v1/models 與 https://openrouter.ai/docs/guides/best-practices/reasoning-tokens 。
+
+本次驗證：99項離線測試、typecheck、web:check通過，涵蓋舊局載入、數值預算、低總額處理、明確設定優先與成功席不重叫。下一步：Ctrl+C停止原服務後npm.cmd start，重新整理頁面再手動繼續B；不自動重試付費對局。尚未以實際付費請求驗證供應商遵守1024上限。UI僅製作三個圖片構想，尚未實作介面。
+
 本次再次暫停：唯讀查詢games.sqlite，最新局ce3b730a已前進到logicalTimeMs=5000，未完成者改為B（Qwen3.8Flash）；HTTP200、finish_reason=length，4096 completion tokens全部為reasoning，其餘A/C/D/E均已成功。上次GLM修正後E已能產生決策，但Qwen仍沿用未限制的推理預設。本次將Qwen3.8Flash納入未顯式設定reasoning時的low預設，於modelForSeat解析時生效，適用恢復舊局；不改寫資料庫設定、快照、原始稽核或成功結果，不提高4096上限。官方參數說明：https://openrouter.ai/docs/guides/best-practices/reasoning-tokens 。低推理是降低截斷風險的設定，並非保證供應商不截斷；未以付費API驗證。
 
 驗證：typecheck、web:check與98項離線測試全部通過。新增保存舊局後的Qwen解析回歸，確認low預設、保留4096、其他席不受影響、顯式effort／推理token設定優先、原始設定無修改；既有截斷單次停止／成功席保留測試亦通過。README新增SQLite明文稽核表位置與唯讀查詢方式。下一步：使用者在原服務終端按Ctrl+C，執行npm.cmd start後重新整理頁面，手動按繼續對局；只重試尚未成功的B。未自動重啟服務或恢復付費對局。
