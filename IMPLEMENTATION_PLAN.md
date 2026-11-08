@@ -1,6 +1,6 @@
 # AI 開工與交接索引
 
-狀態：T1–T3 程式已實作，75 項 scripted 測試通過；套件下載受環境限制，型別檢查待完成。實際命令與版控阻礙見 docs/PROGRESS.md 及 docs/T3_PROGRESS.md。尚未執行真正 LLM 遊戲。使用者要求每階段自動 commit & push 至 git@github.com:mystic01/MinorityPact.git，無需再次核可。
+狀態：T1–T4 程式已實作，81 項 scripted 測試與型別檢查通過。套件／Git 阻礙已解除，T1–T3 已推送，最新進度見 docs/T4_PROGRESS.md。尚未執行真正 LLM 遊戲。使用者要求每階段自動 commit & push 至 git@github.com:mystic01/MinorityPact.git，無需再次核可。
 
 建議：下一步直接實作 T1/T2，不再做第二輪大架構規劃。使用者已確認本機／瀏覽器、OpenRouter、模型設定檔與畫面顯示，以及同批同步／可撤回 ready／不可改票的實驗預設。見 REQUIREMENT.md「最新確認補充」；其他未定設定仍不得稱為正式規則。
 

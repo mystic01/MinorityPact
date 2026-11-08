@@ -2,6 +2,9 @@ import type { DomainEvent } from '../domain/engine.ts';
 import type { DecisionInput, DecisionResult, NextWake } from '../contracts/decision.ts';
 export interface DecisionSnapshot { snapshotId: string; input: DecisionInput }
 export interface SchedulerCheckpoint {
+  initialized?: boolean;
+  wakeQueue?: Record<string, number>;
+  completedDecisions?: SchedulerCheckpoint['pendingDecisions'];
   logicalTimeMs: number;
   subscriptions: Record<string, NextWake>;
   pendingDecisions: { decisionId: string; snapshot: DecisionSnapshot; result?: DecisionResult }[];

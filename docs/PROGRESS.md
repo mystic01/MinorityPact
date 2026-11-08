@@ -1,5 +1,7 @@
 # 實作進度 — 2026-11-08
 
+最新 T4：型別檢查已通過，81 項 scripted 測試；套件與 Git 環境阻礙已解除。T1–T3 已推送 2c9ccf3，T4 詳見 [T4_PROGRESS.md](T4_PROGRESS.md)。下一步 T5 OpenRouter 與 CLI。下方為歷史紀錄，先前「安裝／型別／push 未成功」已被本次解決。
+
 最新：T3 儲存／投影／重播服務已實作，75 項 scripted 測試通過；typecheck 仍受下載限制。版控 commit/push 因 .git 唯讀與 connector 404 未成功。詳見 [T3_PROGRESS.md](T3_PROGRESS.md)。下方保留 T1/T2 紀錄。
 
 T1/T2 程式已實作；規則測試通過，**型別檢查尚未驗證成功，因此未達完整驗收**。

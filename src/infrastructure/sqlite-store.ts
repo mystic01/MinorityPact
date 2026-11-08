@@ -20,6 +20,11 @@ export class SqliteEventStore implements EventStore {
       INSERT OR IGNORE INTO migrations VALUES(1);`);
   }
   close(): void { this.db.close(); }
+  getVersion(id: string): number {
+    const row = this.db.prepare('SELECT version FROM sessions WHERE id=?').get(id);
+    if (!row) throw new Error('Unknown session');
+    return Number(row.version);
+  }
   createSession(id: string, config: SessionConfig): void {
     if (!id.trim()) throw new Error('Invalid session ID');
     const validated = parseConfig(config);
