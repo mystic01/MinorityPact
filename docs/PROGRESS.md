@@ -1,5 +1,7 @@
 # 實作進度 — 2026-11-08
 
+真人模式方向與截斷調查（僅文件／唯讀）：已將「真人提交後推進五秒窗口、同批AI結果暫存、提交與準備投票分開」寫入REQUIREMENT第23節，尚未實作。最新局282227ee於第3回合累計70000ms暫停，唯一未完成者E（z-ai/glm-5.3），A/B/C成功結果已保存，D本批未喚醒。audit440為HTTP200、finish_reason=length：max_tokens4096、reasoning.effort=low，completion_tokens4096，其中reasoning_tokens2850，content789字元；prompt_tokens38451。這是輸出預算耗盡，low不是固定推理token上限，不能保證留足完整JSON所需額度。此前同快照audit434曾完整輸出但被Unknown observed event拒絕，隨後audit436 HTTP402表示當時餘額與進行中請求的額度預留不足；這兩者與本次截斷是不同問題，不推斷目前帳戶餘額。未修改程式／模型參數、未重試API、未恢復對局。下一步待使用者決定是否修改各席輸出預算與精簡回覆／事件引用規則，再另行離線驗證；目前不自動套用。
+
 當批訊息與90秒交涉已完成：新局experimental預設negotiationTimeMs=90000，rulesVersion=minority-pact-v2-immediate、promptVersion=v3-zh-TW-immediate，policies.messageTiming=immediate。公開與私人訊息在動態JSON schema及coordinator驗證均限制scheduledTimeMs等於當前邏輯時間；欲延後表態可預約nextWake，再以最新授權快照思考。保留自行沉默、停止訂閱及原ready邏輯，不強制D或其他席發言。舊局未指定messageTiming時保留scheduled規則及待送訊息，不回寫資料庫。
 
 UI依實際batchId分組而非僅按時間合併，標示「同批獨立表態 · 未參考彼此本批訊息」；舊局明示「舊制同批送達 · 可能包含先前預排訊息」。取消每6.5秒逐席輪播，泡泡及頭像改為「正在閱讀」，可點選公開訊息或頭像切換閱讀（頭像選本回合該席最近公開訊息），泡泡保留時間與批次，避免誤認為正在接話。私訊可見性不變。
