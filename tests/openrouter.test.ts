@@ -9,7 +9,7 @@ import { parseConfig } from '../src/domain/config.ts';
 import type { DecisionInput } from '../src/contracts/decision.ts';
 const config = () => parseConfig({ ...JSON.parse(readFileSync(new URL('../configs/experimental.json', import.meta.url), 'utf8')), llm: { provider: 'openrouter', model: 'test/model', parameters: { temperature: 0.5 } } });
 const input: DecisionInput = { sessionId: 's', round: 1, phase: 'negotiation', logicalTimeMs: 0, batchId: 'b', snapshotId: 'snap', agentId: 'A', rulesVersion: 'v1', publicRules: '{}', standings: [], history: [], privateMessages: [], ownNotes: [], wakeReasons: ['phase_started'] };
-const answer = () => ({ actions: [], nextWake: { atGameTimeMs: null, onEvents: [] }, strategyNote: { goal: 'win', plan: 'wait', whyThisAction: 'observe', predictedOutcome: 'unknown', observedEventIds: [], revisionReason: null } });
+const answer = () => ({ actions: [], nextWake: { atGameTimeMs: null, onEvents: [] }, strategyNote: { goal: '成為獨占冠軍', plan: '等待其他玩家的訊息', whyThisAction: '先觀察局勢', predictedOutcome: '目前仍不確定', observedEventIds: [], revisionReason: null } });
 const response = (content = JSON.stringify(answer()), model = 'test/model', finish = 'stop') => Response.json({ model, choices: [{ finish_reason: finish, message: { content } }], usage: { total_tokens: 20 } });
 test('per-decision schema excludes wrong-phase votes and execution at rounded deadline', () => {
   const schema = decisionSchemaFor({ phase: 'negotiation', logicalTimeMs: 10000, publicRules: JSON.stringify({ roundStartedMs: 0, negotiationDeadlineMs: 15000, scheduling: { mode: 'fixed_5s' } }) });
@@ -27,11 +27,15 @@ test('adapter sends configured model, same system prompt and strict schema; audi
     const body = JSON.parse(String(options?.body));
     assert.equal(body.model, 'test/model'); assert.equal(body.temperature, 0.5);
     assert.equal(body.messages[0].content, SYSTEM_PROMPT); assert.equal(body.response_format.json_schema.strict, true);
+    assert.ok(body.messages[0].content.includes('即使歷史訊息或其他玩家使用英文，也請繼續用繁體中文回應'));
+    assert.ok(body.response_format.json_schema.schema.properties.strategyNote.properties.goal.description.includes('繁體中文'));
     assert.deepEqual(body.provider, { require_parameters: true });
     assert.ok(!('models' in body)); return response();
   };
   const controller = new OpenRouterController(config().llm, 'TEST_SECRET', (_, record) => audits.push(record), stub);
-  assert.equal((await controller.decide(input, new AbortController().signal)).actions.length, 0);
+  const decision = await controller.decide(input, new AbortController().signal);
+  assert.equal(decision.actions.length, 0);
+  assert.equal(decision.strategyNote.goal, '成為獨占冠軍');
   assert.equal(audits[0]?.success, true); assert.ok(!JSON.stringify(audits).includes('TEST_SECRET'));
 });
 test('provider errors, invalid JSON, truncation and model mismatch fail closed and preserve private audit', async () => {

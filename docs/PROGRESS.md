@@ -1,5 +1,7 @@
 # 實作進度 — 2026-11-08
 
+最新語言修改：SYSTEM_PROMPT與JSON Schema的自然語言欄位要求繁體中文，涵蓋公開發言、私訊與策略備忘錄；即使歷史為英文仍用繁中回應，機器協定格式及原始歷史不改寫。新局預設promptVersion=v2-zh-TW。以既有mock測試檢查語言要求確實隨請求傳送、中文回應原樣解析；沒有付費API呼叫。
+
 本輪最終驗證：npm.cmd run typecheck、web:check、build全部通過；npm.cmd test 91項通過；scripted Chrome QA通過；實際main server啟動後HTTP200並已停止preview。正式使用執行npm.cmd start。未進行額外付費API驗證，真實smoke保持中途停止。
 
 最新成本指示：已停止付費多模型smoke（完成4回合、停在第5回合），不得自動resume。改為離線開發；必要API驗證只用便宜模型。詳見AGENTS.md與REAL_SMOKE_STATUS.md。先前「對局進行中」已由此停止紀錄取代。

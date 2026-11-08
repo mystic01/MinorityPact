@@ -1,4 +1,5 @@
-export const SYSTEM_PROMPT = `You compete in Minority Pact with four other agents under identical game rules and available actions. Seats may use different models.
+export const SYSTEM_PROMPT = `語言規則：所有公開發言、私訊，以及策略備忘錄中的 goal、plan、whyThisAction、predictedOutcome、revisionReason，都必須使用自然的繁體中文。即使歷史訊息或其他玩家使用英文，也請繼續用繁體中文回應。玩家代號、模型名稱、專有名詞與必要數學符號可保留原樣。JSON 欄位名稱、action type、事件名稱、red／blue 等協定列舉值及識別碼必須維持規定格式，不可翻譯。不要翻譯、改寫或補寫已存檔的歷史原文。
+You compete in Minority Pact with four other agents under identical game rules and available actions. Seats may use different models.
 Your original objective is to be the unique final champion. Second place has no victory value.
 There are five players choosing red or blue. In a 4:1 split one player is minority; in 3:2 two are minority; in 5:0 nobody is minority and everyone scores zero.
 Use the scoring values, round count, timing and ranking in publicRules. Ranking is total score, then successful minority count, then draw.
@@ -16,18 +17,19 @@ When changing goal supply revisionReason. If you believe winning impossible you 
 Return only the requested JSON object. Use null for absent optional time/revision fields.`;
 
 const str = { type: 'string' };
+const humanText = { type: 'string', description: '必須使用繁體中文撰寫；代號、專有名詞與數學符號可保留。' };
 const number = { type: 'integer', minimum: 0 };
 const obj = (properties: Record<string, unknown>) => ({ type: 'object', properties, required: Object.keys(properties), additionalProperties: false });
 const base = { actionId: str, scheduledTimeMs: number };
 export const DECISION_SCHEMA = obj({
   actions: { type: 'array', items: { anyOf: [
-    obj({ ...base, type: { type: 'string', enum: ['send_public_message'] }, message: str }),
-    obj({ ...base, type: { type: 'string', enum: ['send_private_message'] }, recipientId: str, message: str }),
+    obj({ ...base, type: { type: 'string', enum: ['send_public_message'] }, message: humanText }),
+    obj({ ...base, type: { type: 'string', enum: ['send_private_message'] }, recipientId: str, message: humanText }),
     obj({ ...base, type: { type: 'string', enum: ['set_ready'] }, ready: { type: 'boolean' } }),
     obj({ ...base, type: { type: 'string', enum: ['vote'] }, color: { type: 'string', enum: ['red', 'blue'] } }),
   ] } },
   nextWake: obj({ atGameTimeMs: { anyOf: [number, { type: 'null' }] }, onEvents: { type: 'array', items: { type: 'string', enum: ['private_message_received', 'public_message_received'] } } }),
-  strategyNote: obj({ goal: str, plan: str, whyThisAction: str, predictedOutcome: str, observedEventIds: { type: 'array', items: str }, revisionReason: { type: ['string', 'null'] } }),
+  strategyNote: obj({ goal: humanText, plan: humanText, whyThisAction: humanText, predictedOutcome: humanText, observedEventIds: { type: 'array', items: str }, revisionReason: { type: ['string', 'null'], description: '變更目標的原因，必須使用繁體中文；未變更則為 null。' } }),
 });
 export function decisionSchemaFor(input: { phase: string; logicalTimeMs: number; publicRules: string }) {
   const schema = structuredClone(DECISION_SCHEMA) as any;

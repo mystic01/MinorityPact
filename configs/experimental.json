@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "experimental": true,
   "rulesVersion": "minority-pact-v1",
-  "promptVersion": "v1",
+  "promptVersion": "v2-zh-TW",
   "seed": "experiment-1",
   "players": ["A", "B", "C", "D", "E"],
   "rounds": 10,
