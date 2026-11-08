@@ -16,7 +16,7 @@ watch(source, () => { broken.value = false; });
     <div class="portrait-wrap">
       <div v-if="broken" class="portrait-fallback" aria-label="頭像暫時無法載入">{{ standing.agentId }}</div>
       <img v-else class="portrait" :src="source" :alt="`${standing.agentId} 席人物頭像`" :data-expression="expression" @error="broken = true" draggable="false">
-      <span v-if="speaking" class="speaking-tag"><span class="voice-bars" aria-hidden="true">▂▅▃</span> 發言中</span>
+      <span v-if="speaking" class="speaking-tag">正在閱讀</span>
     </div>
     <div class="nameplate">
       <div class="identity"><b class="seat-letter">{{ standing.agentId }}</b><span class="participant-label" :title="participantLabel">{{ participantLabel }}</span></div>

@@ -2,7 +2,7 @@ import { array, integer, keys, object, oneOf, text } from '../contracts/validati
 export interface Rules {
   players: string[]; rounds: number; negotiationTimeMs: number;
   scoring: { policy: 'exclusive' | 'zero_sum'; solo: number; pair: number; majority: number };
-  policies: { ready: 'revocable_quiet_batch'; vote: 'commit_once'; simultaneous: 'next_batch' };
+  policies: { ready: 'revocable_quiet_batch'; vote: 'commit_once'; simultaneous: 'next_batch'; messageTiming?: 'immediate' | 'scheduled' };
 }
 export interface SessionConfig extends Rules {
   schemaVersion: 1; experimental: true; rulesVersion: string; promptVersion: string; seed: string;
@@ -21,7 +21,7 @@ export function parseConfig(value: unknown): SessionConfig {
   const scoring = { policy: oneOf(s.policy, ['exclusive', 'zero_sum']), solo: integer(s.solo), pair: integer(s.pair), majority: integer(s.majority, -Number.MAX_SAFE_INTEGER) };
   if (scoring.policy === 'exclusive' && scoring.majority !== 0) throw new Error('Exclusive majority must be zero');
   if (scoring.policy === 'zero_sum' && (scoring.solo + 4 * scoring.majority !== 0 || 2 * scoring.pair + 3 * scoring.majority !== 0)) throw new Error('Not zero sum');
-  const p = object(v.policies); keys(p, ['ready', 'vote', 'simultaneous']);
+  const p = object(v.policies); keys(p, ['ready', 'vote', 'simultaneous', 'messageTiming']);
   const t = object(v.scheduling); keys(t, ['mode', 'eventReactionMs']);
   const l = object(v.llm); keys(l, ['provider', 'model', 'displayName', 'parameters']);
   const parameters = object(l.parameters);
@@ -51,7 +51,7 @@ export function parseConfig(value: unknown): SessionConfig {
     ...(seatModels === undefined ? {} : { seatModels }),
     schemaVersion: 1, experimental: true, players, rounds, negotiationTimeMs: integer(v.negotiationTimeMs, 1),
     rulesVersion: text(v.rulesVersion), promptVersion: text(v.promptVersion), seed: text(v.seed), scoring,
-    policies: { ready: oneOf(p.ready, ['revocable_quiet_batch']), vote: oneOf(p.vote, ['commit_once']), simultaneous: oneOf(p.simultaneous, ['next_batch']) },
+    policies: { ready: oneOf(p.ready, ['revocable_quiet_batch']), vote: oneOf(p.vote, ['commit_once']), simultaneous: oneOf(p.simultaneous, ['next_batch']), ...(p.messageTiming === undefined ? {} : { messageTiming: oneOf(p.messageTiming, ['immediate', 'scheduled']) }) },
     scheduling: { mode: oneOf(t.mode, ['fixed_5s', 'fixed_15s', 'event_driven']), eventReactionMs: integer(t.eventReactionMs, 1) },
     llm: { provider: oneOf(l.provider, ['openrouter']), model: text(l.model), parameters: structuredClone(parameters), ...(l.displayName === undefined ? {} : { displayName: text(l.displayName) }) },
   };

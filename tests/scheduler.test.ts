@@ -10,6 +10,43 @@ import { ProviderDecisionError } from '../src/controllers/openrouter.ts';
 const config = (mode: 'fixed_5s' | 'fixed_15s' = 'fixed_5s') => parseConfig({ ...JSON.parse(readFileSync(new URL('../configs/experimental.json', import.meta.url), 'utf8')), scheduling: { mode, eventReactionMs: 1000 }, llm: { provider: 'openrouter', model: 'test/model', parameters: {} } });
 const result = (i: DecisionInput): DecisionResult => ({ actions: i.phase === 'commit' ? [{ type: 'vote', actionId: 'v', color: i.agentId === 'A' ? 'red' : 'blue', scheduledTimeMs: i.logicalTimeMs }] : [], nextWake: { onEvents: [] }, strategyNote: { goal: 'win', plan: 'observe', whyThisAction: 'wait', predictedOutcome: 'unknown', observedEventIds: [] } });
 const pace = async (_: number) => {};
+
+for (const type of ['send_public_message', 'send_private_message'] as const) test(`immediate policy rejects future ${type} without publishing peers`, async () => {
+  const store = new SqliteEventStore(':memory:'); store.createSession('s', config());
+  const controllers = Object.fromEntries(config().players.map(id => [id, { decide: async (i: DecisionInput) => {
+    const r = result(i);
+    if (id === 'A') r.actions = [type === 'send_private_message'
+      ? { type, actionId: 'm', recipientId: 'B', message: 'FUTURE', scheduledTimeMs: 5000 }
+      : { type, actionId: 'm', message: 'FUTURE', scheduledTimeMs: 5000 }];
+    return r;
+  } }]));
+  try {
+    await assert.rejects(new DecisionCoordinator(store, 's', controllers).step(pace), /paused_error/);
+    assert.equal((await store.readEvents('s', 0)).length, 0);
+    assert.equal((await store.loadCheckpoint('s'))?.pendingDecisions.filter(p => p.result).length, 4);
+  } finally { store.close(); }
+});
+
+test('immediate public messages are invisible to same-batch peers and future wake gets fresh history', async () => {
+  const store = new SqliteEventStore(':memory:'); store.createSession('s', config());
+  const seen: DecisionInput[] = [];
+  const controllers = Object.fromEntries(config().players.map(id => [id, { decide: async (i: DecisionInput) => {
+    seen.push(i); const r = result(i);
+    if (i.logicalTimeMs === 0) {
+      r.actions = [{ type: 'send_public_message', actionId: 'm', message: `BATCH_MESSAGE_${id}`, scheduledTimeMs: 0 }];
+      if (id === 'A') r.nextWake.atGameTimeMs = 5000;
+    }
+    return r;
+  } }]));
+  try {
+    const c = new DecisionCoordinator(store, 's', controllers); await c.step(pace); await c.step(pace);
+    assert.equal(seen.length, 6);
+    assert.ok(seen.slice(0, 5).every(i => !JSON.stringify(i).includes('BATCH_MESSAGE_')));
+    assert.ok(JSON.stringify(seen[5]).includes('BATCH_MESSAGE_B'));
+    assert.equal(seen[5]?.logicalTimeMs, 5000);
+    assert.equal((await store.loadCheckpoint('s'))?.pendingActions.length, 0);
+  } finally { store.close(); }
+});
 test('clock remains frozen across arbitrary wall time', () => {
   let wall = 0; const c = new GameClock(0, () => wall); wall = 5; assert.equal(c.read(), 5);
   c.pause(); wall = 99999; assert.equal(c.read(), 5); c.resume(); wall += 3; assert.equal(c.read(), 8);
@@ -55,7 +92,8 @@ test('missing goal-change reason pauses without discarding peers; corrected reas
   } finally { store.close(); }
 });
 test('future message stays private until aligned execution boundary after coordinator restart', async () => {
-  const store = new SqliteEventStore(':memory:'); store.createSession('s', config());
+  const legacy = config(); delete legacy.policies.messageTiming;
+  const store = new SqliteEventStore(':memory:'); store.createSession('s', legacy);
   const controllers = Object.fromEntries(config().players.map(id => [id, { decide: async (i: DecisionInput) => {
     const r = result(i);
     if (id === 'A' && i.logicalTimeMs === 0) r.actions = [{ type: 'send_private_message', actionId: 'later', recipientId: 'B', message: 'FUTURE', scheduledTimeMs: 1 }];

@@ -4,6 +4,11 @@
   .players { top: 210px; }
   .stage { height: 927px; }
 }
+.batch-heading { margin: 8px 0; padding: 8px; color: #e5cf9e; background: #172d27; border-left: 2px solid #b79b61; font-size: 11px; line-height: 1.6; }
+.batch-heading small { display: block; opacity: .65; }
+.read-message { display: block; width: 100%; padding: 0; border: 0; background: transparent; color: inherit; text-align: left; font: inherit; line-height: 1.65; white-space: pre-wrap; cursor: pointer; }
+.read-message:hover { color: #e5cf9e; }
+.player-seat[role="button"] { cursor: pointer; }
 
 /* The desktop game uses the available viewport. Only the journal and open
    settings scroll; the stage, subtitles and controls remain in view. */

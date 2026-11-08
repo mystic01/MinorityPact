@@ -1,8 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { expressionFor, publicSpeech } from '../web/src/presentation.ts';
+import { expressionFor, publicSpeech, groupBatches } from '../web/src/presentation.ts';
 import type { PublicEvent } from '../src/contracts/public.ts';
 const event = (type: string, publicPayload: Record<string, unknown>, logicalTimeMs = 0): PublicEvent => ({ type, publicPayload, logicalTimeMs, eventId: `${type}:${logicalTimeMs}`, batchId: 'b', commitSeq: 1 });
+
+test('same timestamp does not merge distinct decision batches', () => {
+  const a = event('public_message', { sender: 'A', body: 'a' });
+  const b = { ...a, eventId: 'b', batchId: 'second' };
+  assert.deepEqual(groupBatches([a, a, b]).map(g => g.events.length), [2, 1]);
+});
 
 test('stage speech only selects actual public messages from the current round', () => {
   const hidden = event('private_message_sent', { sender: 'A', recipient: 'B', body: 'SECRET' }, 5000);

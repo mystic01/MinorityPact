@@ -63,6 +63,16 @@ try {
   await page.locator('.speech-bubble').waitFor();
   await page.waitForFunction(() => [...document.querySelectorAll<HTMLImageElement>('.portrait')].length === 5 && [...document.querySelectorAll<HTMLImageElement>('.portrait')].every(i => i.complete && i.naturalWidth > 0));
   assert.equal(await page.locator('.player-seat.speaking').count(), 1);
+  assert.ok((await page.locator('.batch-heading').allTextContents()).some(t => t.includes('同批獨立表態')));
+  const speechBatch = page.locator('.event-batch').filter({ has: page.locator('.read-message') });
+  assert.equal(await speechBatch.count(), 1);
+  assert.equal(await speechBatch.locator('.read-message').count(), 5);
+  await page.getByRole('button', { name: 'E', exact: true }).click();
+  await page.waitForFunction(() => document.querySelector('.speech-bubble span')?.textContent?.includes('正在閱讀 E'));
+  await page.waitForTimeout(6700);
+  assert.ok((await page.locator('.speech-bubble span').innerText()).includes('正在閱讀 E'), 'reading focus must not automatically rotate');
+  await page.locator('.read-message').first().click();
+  await page.waitForFunction(() => document.querySelectorAll('.speech-bubble').length === 1 && !document.querySelector('.speech-enter-active,.speech-leave-active'));
   assert.equal(await page.locator('.portrait[data-expression="speaking"]').count(), 1);
   assert.equal(await page.locator('.choice-token svg').count(), 5);
   assert.equal(await page.locator('.choice-token.red,.choice-token.blue').count(), 0);

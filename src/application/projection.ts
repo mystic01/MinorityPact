@@ -35,6 +35,7 @@ export function projectEvent(e: StoredEvent, viewer: Viewer): PublicEvent | null
 export function publicView(state: GameState, config: SessionConfig): PublicView {
   return { sessionId: state.sessionId, round: state.round, phase: state.phase, logicalTimeMs: state.logicalTimeMs,
     rounds: config.rounds, negotiationTimeMs: config.negotiationTimeMs, roundStartedMs: state.roundStartedMs,
+    messageTiming: config.policies.messageTiming ?? 'scheduled',
     outcome: structuredClone(state.outcome),
     ...(config.seatModels ? { seatModels: structuredClone(config.seatModels) } : {}),
     standings: structuredClone(state.standings), model: { provider: config.llm.provider, model: config.llm.model,

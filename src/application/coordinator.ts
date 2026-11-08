@@ -101,7 +101,7 @@ export class DecisionCoordinator {
           pending.result = result;
           writes = writes.then(() => this.save(cp)); await writes; return;
         } catch (error) {
-          const reason = error instanceof Error && ['Unknown observed event', 'Goal change needs reason', 'Wake must be in future', 'Commit requires one vote', 'Invalid action time', 'Action outside negotiation', 'Invalid recipient'].includes(error.message) ? error.message : 'Output format invalid or provider unavailable';
+          const reason = error instanceof Error && ['Unknown observed event', 'Goal change needs reason', 'Wake must be in future', 'Commit requires one vote', 'Invalid action time', 'Messages must use current logicalTimeMs; schedule nextWake to reconsider later', 'Action outside negotiation', 'Invalid recipient'].includes(error.message) ? error.message : 'Output format invalid or provider unavailable';
           pending.validationFeedback = `Previous output was rejected: ${reason}. Follow the exact action schema, current phase and legal scheduledTimeMs. Do not invent action types. Keep the same game snapshot; no new game information is available.`;
           this.store.recordAudit(this.sessionId, pending.snapshot.snapshotId, { kind: 'decision_rejected', attempt: attempt + 1, reason: error instanceof Error ? error.message : 'Unknown error', code: error && typeof error === 'object' && 'code' in error ? error.code : null });
           if (error && typeof error === 'object' && 'retryable' in error && error.retryable === false) throw error;
@@ -147,6 +147,7 @@ export class DecisionCoordinator {
     if (s.phase === 'commit' && (r.actions.length !== 1 || r.actions[0]!.type !== 'vote')) throw new Error('Commit requires one vote');
     for (const a of r.actions) {
       if (a.scheduledTimeMs < input.logicalTimeMs || s.phase === 'commit' && a.scheduledTimeMs !== input.logicalTimeMs) throw new Error('Invalid action time');
+      if (c.policies.messageTiming === 'immediate' && (a.type === 'send_public_message' || a.type === 'send_private_message') && a.scheduledTimeMs !== input.logicalTimeMs) throw new Error('Messages must use current logicalTimeMs; schedule nextWake to reconsider later');
       if (s.phase === 'negotiation' && (a.type === 'vote' || alignTime(a.scheduledTimeMs, c, s.roundStartedMs) >= s.roundStartedMs + c.negotiationTimeMs)) throw new Error('Action outside negotiation');
       if (a.type === 'send_private_message' && (a.recipientId === input.agentId || !c.players.includes(a.recipientId))) throw new Error('Invalid recipient');
     }

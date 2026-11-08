@@ -2,6 +2,16 @@ import type { PublicEvent, Standing } from '../../src/contracts/public.ts';
 
 export type Expression = 'neutral' | 'speaking' | 'smile' | 'doubtful' | 'surprised';
 
+export function groupBatches(events: PublicEvent[]): { batchId: string; events: PublicEvent[] }[] {
+  const groups: { batchId: string; events: PublicEvent[] }[] = [];
+  for (const event of events) {
+    const last = groups.at(-1);
+    if (last?.batchId === event.batchId) last.events.push(event);
+    else groups.push({ batchId: event.batchId, events: [event] });
+  }
+  return groups;
+}
+
 // Presentation consumes the same public projection as the journal. It never infers
 // votes, readiness, private intent, or whether an individual provider is thinking.
 export function expressionFor(agentId: string, speaker: string | undefined, phase: string | undefined, events: PublicEvent[]): Expression {

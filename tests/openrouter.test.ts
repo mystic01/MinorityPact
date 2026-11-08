@@ -11,6 +11,18 @@ const config = () => parseConfig({ ...JSON.parse(readFileSync(new URL('../config
 const input: DecisionInput = { sessionId: 's', round: 1, phase: 'negotiation', logicalTimeMs: 0, batchId: 'b', snapshotId: 'snap', agentId: 'A', rulesVersion: 'v1', publicRules: '{}', standings: [], history: [], privateMessages: [], ownNotes: [], wakeReasons: ['phase_started'] };
 const answer = () => ({ actions: [], nextWake: { atGameTimeMs: null, onEvents: [] }, strategyNote: { goal: '成為獨占冠軍', plan: '等待其他玩家的訊息', whyThisAction: '先觀察局勢', predictedOutcome: '目前仍不確定', observedEventIds: [], revisionReason: null } });
 const response = (content = JSON.stringify(answer()), model = 'test/model', finish = 'stop') => Response.json({ model, choices: [{ finish_reason: finish, message: { content } }], usage: { total_tokens: 20 } });
+
+test('immediate schema constrains both message channels to now while legacy remains schedulable', () => {
+  for (const messageTiming of ['immediate', 'scheduled', undefined]) {
+    const schema = decisionSchemaFor({ ...input, logicalTimeMs: 5000, publicRules: JSON.stringify({ policies: { messageTiming }, negotiationDeadlineMs: 90000, scheduling: { mode: 'fixed_5s' } }) });
+    const [publicMessage, privateMessage, ready] = schema.properties.actions.items.anyOf;
+    for (const branch of [publicMessage, privateMessage]) {
+      assert.equal(branch.properties.scheduledTimeMs.const, messageTiming === 'immediate' ? 5000 : undefined);
+      if (messageTiming !== 'immediate') assert.equal(branch.properties.scheduledTimeMs.maximum, 85000);
+    }
+    assert.equal(ready.properties.scheduledTimeMs.maximum, 85000);
+  }
+});
 test('goal continuation schema permits unchanged goal or requires nonempty reason for rewritten goal', () => {
   const previousGoal = '成為獨占冠軍。';
   const schema = decisionSchemaFor({ ...input, ownNotes: [{ goal: previousGoal }] });
