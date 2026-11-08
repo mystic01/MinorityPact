@@ -14,12 +14,12 @@ test('clock remains frozen across arbitrary wall time', () => {
   let wall = 0; const c = new GameClock(0, () => wall); wall = 5; assert.equal(c.read(), 5);
   c.pause(); wall = 99999; assert.equal(c.read(), 5); c.resume(); wall += 3; assert.equal(c.read(), 8);
 });
-test('token exhaustion stops after one attempt and retains successful peer results', async () => {
+for (const failureCode of ['output_token_limit', 'http_429']) test(`${failureCode} stops after one attempt and retains successful peer results`, async () => {
   const store = new SqliteEventStore(':memory:'); store.createSession('s', config());
   const calls: Record<string, number> = {};
   const controllers = Object.fromEntries(config().players.map(id => [id, { decide: async (i: DecisionInput) => {
     calls[id] = (calls[id] ?? 0) + 1;
-    if (id === 'E') throw new ProviderDecisionError('output_token_limit', false);
+    if (id === 'E') throw new ProviderDecisionError(failureCode, false);
     return result(i);
   } }]));
   try {
@@ -27,7 +27,7 @@ test('token exhaustion stops after one attempt and retains successful peer resul
     assert.equal(calls.E, 1);
     const cp = await store.loadCheckpoint('s');
     assert.equal(cp?.pendingDecisions.filter(p => p.result).length, 4);
-    assert.ok(store.readAudit('s').some(a => a.code === 'output_token_limit'));
+    assert.ok(store.readAudit('s').some(a => a.code === failureCode));
   } finally { store.close(); }
 });
 test('missing goal-change reason pauses without discarding peers; corrected reason resumes original snapshot', async () => {

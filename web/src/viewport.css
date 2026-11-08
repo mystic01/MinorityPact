@@ -1,0 +1,81 @@
+/* Four readable lines instead of two, including on the stacked mobile layout. */
+.speech-bubble p { max-height: 6.6em; }
+@media (max-width: 600px) {
+  .players { top: 210px; }
+  .stage { height: 927px; }
+}
+
+/* The desktop game uses the available viewport. Only the journal and open
+   settings scroll; the stage, subtitles and controls remain in view. */
+@media (min-width: 951px) {
+  .shell { height: 100dvh; display: flex; flex-direction: column; }
+  header { flex: 0 0 60px; min-height: 60px; padding: 8px 2vw; }
+  .brand { font-size: 29px; }
+  .brand span { font-size: 19px; }
+  .brand small { margin-top: 3px; }
+  main { flex: 1; min-height: 0; width: 100%; display: flex; flex-direction: column; }
+  .toolbar { flex: 0 0 46px; min-height: 46px; }
+  .dashboard { flex: 1; min-height: 0; }
+  .arena { display: flex; flex-direction: column; min-height: 0; }
+  .stage { height: auto; flex: 1; min-height: 0; container-type: size; }
+  .stage-heading { top: 10px; left: 16px; right: 16px; font-size: 9px; }
+  .stage-heading .eyebrow { font-size: 8px; }
+  .speech-bubble { top: 30px; left: 7%; width: 86%; max-width: none; padding: 7px 16px; }
+  .speech-bubble span { font-size: 9px; }
+  .speech-bubble p { font: 14px/1.45 var(--serif); max-height: 5.8em; margin-top: 4px; }
+  .welcome { top: 55px; }
+  .welcome p { font-size: 21px; }
+  .players { top: 160px; bottom: 160px; left: 14px; right: 14px; gap: 8px; }
+  .player-seat { min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr) 70px 28px; }
+  .portrait-wrap { height: auto; min-height: 0; }
+  .portrait, .player-seat:nth-child(1) .portrait, .player-seat:nth-child(5) .portrait { height: calc(100% + 12px); }
+  .nameplate { min-height: 0; padding: 5px 8px; }
+  .identity { height: 32px; gap: 6px; }
+  .participant-label { font-size: 11px; line-height: 1.35; }
+  .seat-letter { font-size: 25px; }
+  .seat-score { font-size: 10px; margin-top: 0; flex-wrap: nowrap; }
+  .seat-score strong { font-size: 23px; line-height: 24px; }
+  .seat-score small { font-size: 8px; }
+  .choice-token { margin-top: 5px; width: 36px; height: 22px; }
+  .choice-token svg { width: 14px; height: 14px; }
+  .speaking-tag { bottom: 6px; font-size: 9px; padding: 3px 8px; }
+  .table-surface { top: auto; bottom: 52px; height: 155px; }
+  .table-center { bottom: 65px; padding: 5px 12px; width: 220px; }
+  .table-clock { font-size: 28px; line-height: 1.1; margin: 2px 0; }
+  .phase-caption { font-size: 10px; letter-spacing: 3px; }
+  .table-center small { font-size: 8px; }
+  .outcome { font-size: 20px; line-height: 1.1; margin: 5px 0; }
+  .dialogue-strip { bottom: 8px; left: 16px; right: 16px; min-height: 42px; max-height: 48px; padding: 6px 14px; gap: 12px; }
+  .dialogue-strip b { font-size: 24px; }
+  .dialogue-strip p { font-size: 12px; line-height: 1.5; max-height: 3em; padding-left: 12px; }
+  .stage-footer { flex: 0 0 auto; min-height: 48px; padding: 7px 14px; flex-direction: row; align-items: center; gap: 10px; }
+  .status-line { font-size: 10px; }
+  .controls { flex-wrap: nowrap; }
+  .controls button { padding: 7px 10px; font-size: 10px; }
+  .feed .section-top { padding: 12px 18px; }
+  .feed h2 { padding: 14px 18px 10px; font-size: 21px; }
+  .feed h2 span { display: inline; margin: 0 0 0 12px; font-size: 9px; }
+  .event-list { flex: 1; height: auto; min-height: 0; max-height: none; }
+  .journal-footnote { padding: 8px 16px; font-size: 9px; }
+  footer { flex: 0 0 26px; padding: 7px 0; font-size: 8px; }
+  .notice { flex: 0 0 auto; margin-top: 6px; padding: 8px 14px; }
+  .replay { flex: 0 0 auto; margin-top: 6px; display: flex; align-items: center; }
+  .replay .section-top { padding: 6px 12px; border: 0; gap: 12px; }
+  .replay .eyebrow { display: none; }
+  .replay-controls { flex: 1; padding: 6px 12px; gap: 12px; }
+  .replay-controls button, .replay-controls select { padding: 6px 10px; }
+  .setup { position: fixed; z-index: 20; top: 92px; left: 50%; transform: translateX(-50%); width: min(1100px, calc(100% - 48px)); max-height: calc(100dvh - 116px); margin: 0; overflow: auto; box-shadow: 0 20px 100px #000d, 0 0 0 100vmax #030a078c; }
+}
+
+/* On laptop-height screens, move the clock into the stage header instead of
+   spending another row on it below the players. */
+@media (min-width: 951px) and (max-height: 900px) {
+  .stage-heading { right: 215px; }
+  .table-center { top: 7px; right: 14px; left: auto; bottom: auto; transform: none; width: 180px; padding: 4px 10px; display: flex; align-items: center; justify-content: center; gap: 10px; border-radius: 8px; box-shadow: none; }
+  .table-center small { display: none; }
+  .phase-caption { font-size: 9px; letter-spacing: 1px; white-space: nowrap; }
+  .table-clock { font-size: 25px; letter-spacing: 2px; }
+  .outcome { font-size: 16px; margin: 2px 0; }
+  .speech-bubble { top: 54px; }
+  .players { top: 182px; bottom: 60px; }
+}

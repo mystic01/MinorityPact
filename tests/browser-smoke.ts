@@ -8,17 +8,21 @@ import { SqliteEventStore } from '../src/infrastructure/sqlite-store.ts';
 import { parseConfig } from '../src/domain/config.ts';
 import { createApp } from '../src/server/app.ts';
 import type { DecisionInput, DecisionResult } from '../src/contracts/decision.ts';
+import { ProviderDecisionError } from '../src/controllers/openrouter.ts';
 const config = parseConfig(JSON.parse(readFileSync('configs/experimental.json', 'utf8')));
 const store = new SqliteEventStore(':memory:');
 let releaseStage!: () => void; let firstBoundary = true;
+let rateLimitNext = false;
 const stageGate = new Promise<void>(resolve => { releaseStage = resolve; });
-const app = createApp({ store, config, apiKey: 'SCRIPTED_TEST_ONLY', pace: async ms => { if (ms && firstBoundary) { firstBoundary = false; await stageGate; } }, controllers: c => Object.fromEntries(c.players.map(id => [id, { decide: async (i: DecisionInput): Promise<DecisionResult> => ({
+const app = createApp({ store, config, apiKey: 'SCRIPTED_TEST_ONLY', pace: async ms => { if (ms && firstBoundary) { firstBoundary = false; await stageGate; } }, controllers: c => Object.fromEntries(c.players.map(id => [id, { decide: async (i: DecisionInput): Promise<DecisionResult> => {
+  if (rateLimitNext && id === 'D') throw new ProviderDecisionError('http_429', false);
+  return {
   actions: i.phase === 'commit' ? [{ type: 'vote', actionId: 'v', color: id === 'A' ? 'red' : 'blue', scheduledTimeMs: i.logicalTimeMs }] : [
     ...(id === 'A' && i.round === 1 ? [{ type: 'send_private_message' as const, actionId: 'm', recipientId: 'B', message: 'BROWSER_SECRET', scheduledTimeMs: i.logicalTimeMs }] : []),
-    ...(i.round === 1 ? [{ type: 'send_public_message' as const, actionId: 'public', message: `${id}：這一輪，我想聽聽大家的選擇。`, scheduledTimeMs: i.logicalTimeMs }] : []),
+    ...(i.round === 1 ? [{ type: 'send_public_message' as const, actionId: 'public', message: `${id}：這一輪，我想聽聽大家的選擇。\n先聽各位的想法，再決定我的立場。\n我希望我們能保留討論的空間。\n最後的選擇，仍由每個人自己決定。`, scheduledTimeMs: i.logicalTimeMs }] : []),
     { type: 'set_ready', actionId: 'r', ready: true, scheduledTimeMs: i.logicalTimeMs },
   ], nextWake: { onEvents: [] }, strategyNote: { goal: 'win', plan: 'SCRIPTED_PLAN', whyThisAction: 'test', predictedOutcome: 'unknown', observedEventIds: [] },
-}) }])) });
+}; } }])) });
 app.server.listen(0, '127.0.0.1'); await once(app.server, 'listening');
 const browser = await chromium.launch({ executablePath: process.env.BROWSER_PATH ?? 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true });
 const page = await browser.newPage({ viewport: { width: 1440, height: 1100 } });
@@ -33,11 +37,28 @@ async function assertStageLayout() {
       return rect.left < clock.right && rect.right > clock.left && rect.top < clock.bottom && rect.bottom > clock.top;
     }).map(el => el.className);
   });
+  if (problems.length) {
+    mkdirSync('.npm-cache/browser-qa', { recursive: true });
+    await page.screenshot({ path: '.npm-cache/browser-qa/layout-failure.png', fullPage: true });
+    console.log(await page.evaluate(() => [...document.querySelectorAll('.stage,.players,.player-seat,.portrait-wrap,.table-center,.nameplate,.choice-token')].map(el => ({ name: el.className, top: el.getBoundingClientRect().top, height: el.getBoundingClientRect().height, bottom: el.getBoundingClientRect().bottom }))));
+  }
   assert.deepEqual(problems, [], 'clock must not cover seat labels or reveal tokens');
+}
+async function assertViewportFit() {
+  const layout = await page.evaluate(() => ({
+    pageHeight: document.documentElement.scrollHeight, viewportHeight: innerHeight,
+    outside: [...document.querySelectorAll('.dashboard,.stage-footer,.dialogue-strip,.journal-footnote,.replay')].filter(el => {
+      const r = el.getBoundingClientRect(); return r.top < 0 || r.bottom > innerHeight + 1;
+    }).map(el => el.className),
+  }));
+  assert.ok(layout.pageHeight <= layout.viewportHeight + 1, `page must fit viewport: ${JSON.stringify(layout)}`);
+  assert.deepEqual(layout.outside, [], 'subtitles, controls and journal must be fully visible');
 }
 try {
   await page.goto(`http://127.0.0.1:${(app.server.address() as AddressInfo).port}`);
+  await page.getByLabel('對局回合數').selectOption('5');
   await page.getByRole('button', { name: '建立新對局 ＋' }).click();
+  await page.waitForFunction(() => document.querySelector('.header-round')?.textContent?.includes('/ 5'));
   await page.getByRole('button', { name: '開始對局', exact: true }).click();
   await page.locator('.speech-bubble').waitFor();
   await page.waitForFunction(() => [...document.querySelectorAll<HTMLImageElement>('.portrait')].length === 5 && [...document.querySelectorAll<HTMLImageElement>('.portrait')].every(i => i.complete && i.naturalWidth > 0));
@@ -46,6 +67,15 @@ try {
   assert.equal(await page.locator('.choice-token svg').count(), 5);
   assert.equal(await page.locator('.choice-token.red,.choice-token.blue').count(), 0);
   await assertStageLayout();
+  for (const [width, height] of [[1366,768],[1440,900],[1280,720],[1280,600],[1024,768]] as const) {
+    await page.setViewportSize({ width, height });
+    await assertViewportFit();
+    await assertStageLayout();
+    const bubble = await page.locator('.speech-bubble p').evaluate(el => ({ height: el.clientHeight, scroll: el.scrollHeight, line: parseFloat(getComputedStyle(el).lineHeight) }));
+    assert.ok(bubble.height >= bubble.line * 3.9, 'speech bubble must display four lines');
+    assert.ok(bubble.scroll <= bubble.height + 1, 'four-line speech should fit without scrolling');
+  }
+  await page.setViewportSize({ width: 1366, height: 768 });
   assert.ok(!(await page.locator('body').innerText()).includes('BROWSER_SECRET'));
   mkdirSync('.npm-cache/browser-qa', { recursive: true });
   await page.screenshot({ path: '.npm-cache/browser-qa/theater-speaking.png', fullPage: true });
@@ -69,6 +99,8 @@ try {
   }
   await page.setViewportSize({ width: 1440, height: 1100 });
   await page.getByRole('button', { name: '終局重播 ↗' }).click();
+  await page.setViewportSize({ width: 1366, height: 768 });
+  await assertViewportFit();
   await page.getByLabel('解鎖私訊與策略').check();
   await page.getByLabel('重播事件位置').evaluate((node: HTMLInputElement) => { node.value = node.max; node.dispatchEvent(new Event('input', { bubbles: true })); });
   await page.getByText('BROWSER_SECRET', { exact: true }).waitFor();
@@ -77,6 +109,15 @@ try {
   await page.setViewportSize({ width: 390, height: 844 });
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
   await page.screenshot({ path: '.npm-cache/browser-qa/mobile.png', fullPage: true });
+  await page.setViewportSize({ width: 1366, height: 768 });
+  rateLimitNext = true;
+  await page.getByRole('button', { name: '新對局 ＋', exact: true }).click();
+  await page.getByRole('button', { name: '建立新對局 ＋' }).click();
+  await page.getByRole('button', { name: '開始對局', exact: true }).click();
+  await page.locator('[role="alert"]').filter({ hasText: 'HTTP 429' }).waitFor();
+  await assertViewportFit();
+  await assertStageLayout();
+  await page.screenshot({ path: '.npm-cache/browser-qa/theater-paused.png', fullPage: true });
   assert.deepEqual(errors, []);
   assert.deepEqual(failedAssets, []);
   console.log('SCRIPTED browser QA passed: create/start, 5 portraits, speaking expression, sealed/revealed choices, live privacy, replay secret toggle, mobile width, no page errors.');

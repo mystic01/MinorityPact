@@ -22,6 +22,10 @@ test('configuration rejects empty model, missing rules, duplicate/unequal seats 
   assert.throws(() => parseConfig({ ...c, llm: { ...c.llm, apiKey: 'secret' } }));
   assert.throws(() => parseConfig({ ...c, scoring: { policy: 'zero_sum', solo: 8, pair: 4, majority: -2 } }));
 });
+test('five-round short games are accepted without opening unsupported round counts', () => {
+  assert.equal(parseConfig({ ...raw(), rounds: 5 }).rounds, 5);
+  for (const rounds of [0, 4, 6, 9, 13, 5.5]) assert.throws(() => parseConfig({ ...raw(), rounds }));
+});
 for (const policy of ['exclusive', 'zero_sum'] as const) {
   for (let mask = 0; mask < 32; mask++) test(`${policy}: vote pattern ${mask}`, () => {
     const votes = Object.fromEntries(ids.map((id, i) => [id, mask & (1 << i) ? 'red' : 'blue'])) as Record<string, Color>;
@@ -63,8 +67,8 @@ test('illegal actor, recipient, color, duplicate actions and mixed illegal batch
   const committed = apply(s, [], config().negotiationTimeMs);
   assert.throws(() => apply(committed, [action('A', { ...vote, scheduledTimeMs: committed.logicalTimeMs, color: 'green' } as unknown as Action)]));
 });
-test('ten/twelve scripted rounds accumulate, reveal only after five votes, no elimination', () => {
-  for (const rounds of [10, 12]) {
+test('five/ten/twelve scripted rounds accumulate, reveal only after five votes, no elimination', () => {
+  for (const rounds of [5, 10, 12]) {
     let s = createGame('s', { ...config(), rounds });
     for (let round = 1; round <= rounds; round++) {
       s = apply(s, [], s.roundStartedMs + s.rules.negotiationTimeMs);

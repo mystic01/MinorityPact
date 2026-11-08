@@ -27,11 +27,14 @@ export function createApp(options: AppOptions) {
   let active: string | null = null;
   const clocks = new Map<string, number>();
   const statusFor = (id: string, phase: string) => states.get(id) === 'aborted' ? 'aborted' : phase === 'completed' ? 'completed' : states.get(id) ?? 'idle';
-  const errorFor = (id: string) => {
+  const errorFor = async (id: string) => {
     if (states.get(id) !== 'paused_error') return undefined;
-    const failure = store.readAudit(id).filter(a => a.kind === 'decision_rejected').at(-1);
+    const cp = await store.loadCheckpoint(id);
+    const failedSnapshots = cp?.pendingDecisions.filter(p => !p.result).map(p => p.snapshot.snapshotId) ?? [];
+    const failure = store.readAudit(id, failedSnapshots).filter(a => a.kind === 'decision_rejected').at(-1);
     if (failure?.code === 'output_token_limit') return '模型的輸出／推理額度已耗盡，回覆被截斷。已停止自動重試並保留進度，請調整推理強度或輸出上限後再繼續。';
     if (failure?.code === 'http_402') return 'OpenRouter 額度不足或無法負擔此次輸出預留上限。已停止自動重試並保留進度。';
+    if (failure?.code === 'http_429') return '模型供應商暫時限制請求（HTTP 429）。已停止立即重試並保留進度，請稍後按「繼續對局」；已成功的席位不會重複呼叫。';
     return undefined;
   };
   const json = (res: ServerResponse, status: number, value: unknown) => { res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(value)); };
@@ -116,7 +119,7 @@ export function createApp(options: AppOptions) {
             try {
               const view = await replay.read(id, { kind: 'spectator' }, Number.MAX_SAFE_INTEGER, cursor);
               cursor = view.lastSeq;
-              res.write(`id: ${cursor}\nevent: snapshot\ndata: ${JSON.stringify({ ...view, errorMessage: errorFor(id), clockTimeMs: states.get(id) === 'advancing' ? clocks.get(id) ?? view.state.logicalTimeMs : view.state.logicalTimeMs, status: statusFor(id, view.state.phase) })}\n\n`);
+              res.write(`id: ${cursor}\nevent: snapshot\ndata: ${JSON.stringify({ ...view, errorMessage: await errorFor(id), clockTimeMs: states.get(id) === 'advancing' ? clocks.get(id) ?? view.state.logicalTimeMs : view.state.logicalTimeMs, status: statusFor(id, view.state.phase) })}\n\n`);
             } catch { res.end(); } finally { busy = false; }
           };
           await send(); const timer = setInterval(() => { void send(); }, 500);
@@ -131,7 +134,7 @@ export function createApp(options: AppOptions) {
         const after = Number(url.searchParams.get('after') ?? 0);
         if (omniscient && states.get(id) === 'aborted') throw new Error('Aborted replay locked');
         const view = await replay.read(id, { kind: omniscient ? 'omniscient' : 'spectator' }, through, after);
-        return json(res, 200, { ...view, errorMessage: errorFor(id), status: statusFor(id, view.state.phase) });
+        return json(res, 200, { ...view, errorMessage: await errorFor(id), status: statusFor(id, view.state.phase) });
       }
       const root = resolve(options.assets ?? 'dist');
       const relative = decodeURIComponent(url.pathname === '/' ? '/index.html' : url.pathname);

@@ -26,7 +26,7 @@ export class OpenRouterController implements AgentController {
       const response = await this.fetcher('https://openrouter.ai/api/v1/chat/completions', { method: 'POST', signal,
         headers: { Authorization: `Bearer ${this.key}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       status = response.status; responseBody = await response.text();
-      if (!response.ok) throw new ProviderDecisionError(`http_${response.status}`, ![400,401,402,403,404].includes(response.status));
+      if (!response.ok) throw new ProviderDecisionError(`http_${response.status}`, ![400,401,402,403,404,429].includes(response.status));
       const data = object(JSON.parse(responseBody));
       if (data.error || data.model !== this.llm.model) throw new Error('Model mismatch or provider error');
       if (!Array.isArray(data.choices) || data.choices.length !== 1) throw new Error('Expected one choice');

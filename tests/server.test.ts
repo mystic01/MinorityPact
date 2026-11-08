@@ -6,6 +6,8 @@ import type { AddressInfo } from 'node:net';
 import { parseConfig, modelForSeat } from '../src/domain/config.ts';
 import { SqliteEventStore } from '../src/infrastructure/sqlite-store.ts';
 import { createApp } from '../src/server/app.ts';
+import { DecisionCoordinator } from '../src/application/coordinator.ts';
+import { ProviderDecisionError } from '../src/controllers/openrouter.ts';
 import type { DecisionInput, DecisionResult } from '../src/contracts/decision.ts';
 const config = () => parseConfig(JSON.parse(readFileSync(new URL('../configs/experimental.json', import.meta.url), 'utf8')));
 test('five seat models are distinct, configurable, and frozen per saved session', () => {
@@ -20,6 +22,29 @@ test('GLM uses low reasoning by default while explicit user reasoning is preserv
   c.llm.parameters.reasoning = { effort: 'high' };
   assert.deepEqual(modelForSeat(c, 'E').parameters.reasoning, { effort: 'high' });
   assert.equal(modelForSeat(c, 'E').parameters.max_tokens, 4096);
+});
+
+test('paused HTTP/SSE reports the unresolved rate limit instead of a resolved peers later rejection', async () => {
+  const store = new SqliteEventStore(':memory:'); const c = config(); store.createSession('limited', c);
+  const controllers = Object.fromEntries(c.players.map(id => [id, { decide: async (): Promise<DecisionResult> => {
+    if (id === 'D') throw new ProviderDecisionError('http_429', false);
+    return { actions: [], nextWake: { onEvents: [] }, strategyNote: { goal: 'win', plan: 'PRIVATE_PLAN', whyThisAction: 'wait', predictedOutcome: 'unknown', observedEventIds: [] } };
+  } }]));
+  await assert.rejects(new DecisionCoordinator(store, 'limited', controllers).step(async () => {}));
+  const cp = (await store.loadCheckpoint('limited'))!;
+  const peer = cp.pendingDecisions.find(p => p.snapshot.input.agentId === 'A')!;
+  store.recordAudit('limited', peer.snapshot.snapshotId, { kind: 'decision_rejected', code: 'invalid_response', reason: 'PRIVATE_PROVIDER_DETAIL' });
+  store.setStatus('limited', 'paused_error');
+  const app = createApp({ store, config: c }); app.server.listen(0, '127.0.0.1'); await once(app.server, 'listening');
+  const root = `http://127.0.0.1:${(app.server.address() as AddressInfo).port}`;
+  try {
+    const view = await (await fetch(`${root}/api/sessions/limited`)).text();
+    assert.ok(view.includes('HTTP 429')); assert.ok(!view.includes('PRIVATE_'));
+    const abort = new AbortController();
+    const response = await fetch(`${root}/api/sessions/limited/stream`, { signal: abort.signal });
+    const chunk = new TextDecoder().decode((await response.body!.getReader().read()).value); abort.abort();
+    assert.ok(chunk.includes('HTTP 429')); assert.ok(!chunk.includes('PRIVATE_'));
+  } finally { app.stop(); store.close(); }
 });
 
 test('saved Qwen sessions resolve a numeric reasoning budget without mutating config or other seats', () => {

@@ -4,6 +4,8 @@
 
 觀戰介面採劇場交涉牌桌，五席獨立頭像會隨公開發言與已揭曉得分切換表情；右側保留公開紀錄，設定由「新對局 ＋」展開。真人席位尚未實作，介面元件已預留參與者名稱與人物分離。設計、資訊界線與背景生成提示見 [UI_THEATER.md](docs/UI_THEATER.md)。
 
+新局可選5／10／12局。桌機畫面依視窗高度縮放，字幕與操作列保持可見，公開發言泡泡可顯示四行。供應商HTTP429會暫停並顯示限流原因，停止立即自動重試；稍後手動繼續時保留其他成功席位的結果。
+
 啟動：`npm.cmd start`，開啟 http://127.0.0.1:3000。預設五席為 GLM 5.3 Flash、Qwen3.8 Flash、DeepSeek V3.2、Gemini 2.5 Flash Lite、GLM 5.3；設定存於 configs/experimental.json 的 seatModels，可在建立新局前於畫面調整。共同 max_tokens 暫設4096，避免使用供應商過大的預設輸出預留額度；這是含推理在內的輸出預算，非訊息數限制，若發生截斷須再調校。真實執行需要本機 .env 的 OPENROUTER_API_KEY。每局設定凍結，歷史重播顯示當局模型。server 預設採 experimental.json；可設定 GAME_CONFIG 指向其他檔案。
 
 ```powershell

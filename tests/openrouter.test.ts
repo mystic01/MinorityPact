@@ -81,6 +81,13 @@ test('truncated output is a nonretryable token-budget error', async () => {
   await assert.rejects(controller.decide(input, new AbortController().signal), e => e instanceof ProviderDecisionError && e.code === 'output_token_limit' && e.retryable === false);
   assert.equal(audits[0]?.code, 'output_token_limit');
 });
+
+test('rate limiting stops immediate retries without exposing provider error bodies', async () => {
+  const audits: Record<string, unknown>[] = [];
+  const controller = new OpenRouterController(config().llm, 'TEST_SECRET', (_, r) => audits.push(r), async () => new Response('PRIVATE_PROVIDER_DETAIL', { status: 429 }));
+  await assert.rejects(controller.decide(input, new AbortController().signal), e => e instanceof ProviderDecisionError && e.code === 'http_429' && e.retryable === false && !e.message.includes('PRIVATE_PROVIDER_DETAIL'));
+  assert.equal(audits[0]?.status, 429);
+});
 test('mock HTTP five-controller ten-round integration persists raw responses and finishes', async () => {
   const store = new SqliteEventStore(':memory:'); const c = config(); store.createSession('s', c);
   const mock: typeof fetch = async (_, options) => {

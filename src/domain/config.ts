@@ -16,7 +16,7 @@ export function parseConfig(value: unknown): SessionConfig {
   if (v.schemaVersion !== 1 || v.experimental !== true) throw new Error('Expected experimental schema v1');
   const players = array(v.players).map(text);
   if (players.length !== 5 || new Set(players).size !== 5 || players.some(id => !/^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(id) || ['__proto__', 'constructor', 'prototype'].includes(id))) throw new Error('Exactly five distinct safe seat IDs required');
-  const rounds = integer(v.rounds, 10); if (rounds > 12) throw new Error('Expected 10–12 rounds');
+  const rounds = integer(v.rounds, 5); if (rounds !== 5 && (rounds < 10 || rounds > 12)) throw new Error('Expected 5 or 10–12 rounds');
   const s = object(v.scoring); keys(s, ['policy', 'solo', 'pair', 'majority']);
   const scoring = { policy: oneOf(s.policy, ['exclusive', 'zero_sum']), solo: integer(s.solo), pair: integer(s.pair), majority: integer(s.majority, -Number.MAX_SAFE_INTEGER) };
   if (scoring.policy === 'exclusive' && scoring.majority !== 0) throw new Error('Exclusive majority must be zero');

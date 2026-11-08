@@ -35,8 +35,11 @@ export class SqliteEventStore implements EventStore {
   recordAudit(sessionId: string, snapshotId: string, record: Record<string, unknown>): void {
     this.db.prepare('INSERT INTO decision_audit(session_id,snapshot_id,record) VALUES(?,?,?)').run(sessionId, snapshotId, JSON.stringify(record));
   }
-  readAudit(sessionId: string): Record<string, unknown>[] {
-    return this.db.prepare('SELECT record FROM decision_audit WHERE session_id=? ORDER BY id').all(sessionId).map(row => JSON.parse(String(row.record)) as Record<string, unknown>);
+  readAudit(sessionId: string, snapshotIds?: readonly string[]): Record<string, unknown>[] {
+    const snapshots = snapshotIds === undefined ? undefined : new Set(snapshotIds);
+    return this.db.prepare('SELECT snapshot_id,record FROM decision_audit WHERE session_id=? ORDER BY id').all(sessionId)
+      .filter(row => snapshots === undefined || snapshots.has(String(row.snapshot_id)))
+      .map(row => JSON.parse(String(row.record)) as Record<string, unknown>);
   }
   readCompletedDecisions(sessionId: string): SchedulerCheckpoint['pendingDecisions'] {
     return this.db.prepare('SELECT record FROM decision_records WHERE session_id=? ORDER BY rowid').all(sessionId).map(row => JSON.parse(String(row.record)));
