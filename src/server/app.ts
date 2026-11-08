@@ -72,7 +72,8 @@ export function createApp(options: AppOptions) {
       if (req.headers.origin && req.headers.origin !== `http://${host}`) return json(res, 403, { error: 'Forbidden origin' });
       if (req.headers['sec-fetch-site'] === 'cross-site') return json(res, 403, { error: 'Forbidden site' });
       const parts = url.pathname.split('/').filter(Boolean);
-      if (url.pathname === '/api/bootstrap') return json(res, 200, { token, hasKey: Boolean(options.apiKey), config: options.config });
+      if (url.pathname === '/api/bootstrap') return json(res, 200, { token, hasKey: Boolean(options.apiKey), config: { ...options.config,
+        seatModels: Object.fromEntries(options.config.players.map(id => { const m = modelForSeat(options.config, id); return [id, { model: m.model, displayName: m.displayName ?? m.model }]; })) } });
       if (parts[0] === 'api') {
         if (req.method === 'POST') {
           const auth = String(req.headers['x-operation-token'] ?? '');

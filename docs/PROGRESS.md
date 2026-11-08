@@ -1,5 +1,9 @@
 # 實作進度 — 2026-11-08
 
+本輪最終驗證：npm.cmd run typecheck、web:check、build全部通過；npm.cmd test 91項通過；scripted Chrome QA通過；實際main server啟動後HTTP200並已停止preview。正式使用執行npm.cmd start。未進行額外付費API驗證，真實smoke保持中途停止。
+
+最新成本指示：已停止付費多模型smoke（完成4回合、停在第5回合），不得自動resume。改為離線開發；必要API驗證只用便宜模型。詳見AGENTS.md與REAL_SMOKE_STATUS.md。先前「對局進行中」已由此停止紀錄取代。
+
 最新T8工程：12格scripted矩陣、公開指標報告工具及Chrome瀏覽器QA已建立；91項測試、前後端型別、build與browser smoke通過。T6 b760232、T7 acac7dd已推送。真實五Gemini對局仍進行中，不提前宣稱終局成功；詳見T8_PROGRESS.md。
 
 最新T7：完成依原logicalTime播放、倍速、公知／全知切換與seek；T6已推送 b760232。真實多模型smoke已啟動，五席均成功回應，正在完成回合；不提前宣稱真實驗收通過。詳見T7_PROGRESS.md。

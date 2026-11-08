@@ -1,5 +1,7 @@
 # T8 工程工具與 QA — 2026-11-08
 
+最新：真實smoke已依成本要求停止，完成4回合，沒有終局結果；見REAL_SMOKE_STATUS.md。後續只做必要的便宜API驗證，預設離線。本文後方「進行中／待完成」為歷史，不代表會自動繼續付費測試。
+
 已增加 experiment matrix/report CLI。matrix 產生 B/C × 5s/15s/event-driven × 10/12 共12份配置，不自動呼叫付費API；report 僅輸出分數、訊息／策略數量、模型、配置、event hash、API用量／回報成本、錯誤次數，不輸出私訊或策略原文，不生成劇情解釋。
 
 已完成12格 scripted 端到端排程驗證，91項測試、backend typecheck、Vue typecheck與build通過。decision_records v3將完成的原始決策快照獨立不可變存檔，checkpoint只留未完成決策；避免每次提交重寫全部歷史。12格測試時間由約42秒降至15秒，沒有截斷模型可見歷史。
