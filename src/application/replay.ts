@@ -7,6 +7,11 @@ import type { SqliteEventStore } from '../infrastructure/sqlite-store.ts';
 export class ReplayService {
   private store: SqliteEventStore;
   constructor(store: SqliteEventStore) { this.store = store; }
+  async timeline(sessionId: string) {
+    const view = await this.read(sessionId, { kind: 'omniscient' }); // completed gate, even though metadata only
+    const all = await this.store.readEvents(sessionId, 0);
+    return { lastSeq: view.lastSeq, entries: all.map(e => ({ commitSeq: e.commitSeq, logicalTimeMs: e.logicalTimeMs })) };
+  }
   async read(sessionId: string, viewer: Viewer, through = Number.MAX_SAFE_INTEGER, after = 0) {
     if (!Number.isSafeInteger(through) || through < 0 || !Number.isSafeInteger(after) || after < 0 || after > through) throw new Error('Invalid cursor');
     const config = this.store.getConfig(sessionId);

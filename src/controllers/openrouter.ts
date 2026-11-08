@@ -2,7 +2,7 @@ import type { AgentController, DecisionInput, DecisionResult } from '../contract
 import { parseDecision } from '../contracts/schema.ts';
 import { object } from '../contracts/validation.ts';
 import type { SessionConfig } from '../domain/config.ts';
-import { SYSTEM_PROMPT, DECISION_SCHEMA } from './prompt.ts';
+import { SYSTEM_PROMPT, decisionSchemaFor } from './prompt.ts';
 export type AuditSink = (snapshotId: string, record: Record<string, unknown>) => void;
 export class OpenRouterController implements AgentController {
   private llm: SessionConfig['llm']; private key: string; private fetcher: typeof fetch; private audit: AuditSink;
@@ -14,7 +14,7 @@ export class OpenRouterController implements AgentController {
     const body = { ...this.llm.parameters, model: this.llm.model, stream: false,
       provider: { require_parameters: true },
       messages: [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: JSON.stringify(input) }],
-      response_format: { type: 'json_schema', json_schema: { name: 'minority_decision', strict: true, schema: DECISION_SCHEMA } } };
+      response_format: { type: 'json_schema', json_schema: { name: 'minority_decision', strict: true, schema: decisionSchemaFor(input) } } };
     const started = Date.now(); let responseBody: string | null = null; let status: number | null = null;
     const redact = (value: unknown): unknown => JSON.parse(JSON.stringify(value).split(this.key).join('[REDACTED]'));
     try {

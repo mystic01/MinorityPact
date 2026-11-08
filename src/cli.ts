@@ -11,7 +11,7 @@ import { ReplayService } from './application/replay.ts';
 async function main(): Promise<void> {
   const [command, configPath, databasePath = 'data/games.sqlite', givenId] = process.argv.slice(2);
   if (!['check', 'start', 'resume'].includes(command ?? '') || !configPath || command === 'resume' && !givenId) throw new Error('Usage: npm run game -- check|start|resume CONFIG [DATABASE] [SESSION_ID]');
-  const config = parseConfig(JSON.parse(readFileSync(configPath, 'utf8')));
+  const config = parseConfig(JSON.parse(readFileSync(configPath, 'utf8').replace(/^\uFEFF/, '')));
   if (command === 'check') { console.log(`Valid config: OpenRouter · ${config.llm.displayName ?? config.llm.model}`); return; }
   const key = process.env.OPENROUTER_API_KEY;
   if (!key?.trim()) throw new Error('Set OPENROUTER_API_KEY before starting');

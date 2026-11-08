@@ -6,7 +6,7 @@ import { createApp } from './app.ts';
 const path = resolve(process.env.GAME_DATABASE ?? 'data/games.sqlite'); mkdirSync(dirname(path), { recursive: true });
 const lock = openSync(`${path}.lock`, 'wx');
 const store = new SqliteEventStore(path);
-const config = parseConfig(JSON.parse(readFileSync(process.env.GAME_CONFIG ?? 'configs/experimental.json', 'utf8')));
+const config = parseConfig(JSON.parse(readFileSync(process.env.GAME_CONFIG ?? 'configs/experimental.json', 'utf8').replace(/^\uFEFF/, '')));
 const app = createApp({ store, config, ...(process.env.OPENROUTER_API_KEY ? { apiKey: process.env.OPENROUTER_API_KEY } : {}) });
 app.server.listen(3000, '127.0.0.1', () => console.log('Minority Pact: http://127.0.0.1:3000'));
 for (const signal of ['SIGINT', 'SIGTERM'] as const) process.once(signal, () => { app.stop(); closeSync(lock); unlinkSync(`${path}.lock`); process.exit(); });

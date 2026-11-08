@@ -115,6 +115,10 @@ export function createApp(options: AppOptions) {
           req.on('close', () => clearInterval(timer)); return;
         }
         const omniscient = action === 'replay' && url.searchParams.get('view') === 'omniscient';
+        if (action === 'timeline') {
+          if (states.get(id) === 'aborted') throw new Error('Replay locked');
+          return json(res, 200, await replay.timeline(id));
+        }
         const through = Number(url.searchParams.get('through') ?? Number.MAX_SAFE_INTEGER);
         const after = Number(url.searchParams.get('after') ?? 0);
         if (omniscient && states.get(id) === 'aborted') throw new Error('Aborted replay locked');

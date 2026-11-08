@@ -1,18 +1,21 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import type { PublicView, PublicEvent } from '../../src/contracts/public.ts';
+import { advancePlayback } from '../../src/contracts/timeline.ts';
+import type { TimelineEntry } from '../../src/contracts/timeline.ts';
 type View = { state: PublicView; events: PublicEvent[]; lastSeq: number; status: string; clockTimeMs?: number };
 const token = ref(''), hasKey = ref(false), ids = ref<string[]>([]), selected = ref(''), config = ref<any>(null);
 const view = ref<View | null>(null), events = ref<PublicEvent[]>([]), error = ref(''), connected = ref(false);
 const replayMode = ref(false), god = ref(false), playing = ref(false), cursor = ref(0), maximum = ref(0), speed = ref(1);
 let stream: EventSource | null = null, timer: ReturnType<typeof setInterval> | undefined;
 let generation = 0;
+let timeline: TimelineEntry[] = [], playhead = 0;
 const state = computed(() => view.value?.state);
 const phases: Record<string, string> = { negotiation: '自由交涉', commit: '秘密投票', reveal: '揭曉與計分', completed: '賽局結束' };
 const statusLabel = computed(() => replayMode.value ? '重播檢視' : ({ running: '等待 AI 決策 · 遊戲時鐘暫停', advancing: '交涉進行中', paused: '已暫停', paused_error: '對局暫停 · 請檢查私有稽核紀錄後重試', completed: '已完局 · 可解鎖上帝視角', aborted: '已中止', idle: '準備開始' } as Record<string, string>)[view.value?.status ?? 'idle']);
 const time = (ms: number) => `${Math.floor(ms / 60000).toString().padStart(2, '0')}:${Math.floor(ms / 1000 % 60).toString().padStart(2, '0')}`;
 const remaining = computed(() => Math.max(0, (state.value?.negotiationTimeMs ?? 0) - ((view.value?.clockTimeMs ?? state.value?.logicalTimeMs ?? 0) - (state.value?.roundStartedMs ?? 0))));
-const votes = computed(() => [...events.value].reverse().find(e => e.type === 'votes_revealed')?.publicPayload.votes as Record<string, string> | undefined);
+const votes = computed(() => ['reveal', 'completed'].includes(state.value?.phase ?? '') ? [...events.value].reverse().find(e => e.type === 'votes_revealed')?.publicPayload.votes as Record<string, string> | undefined : undefined);
 const models = ['google/gemini-2.5-flash', 'google/gemini-2.5-pro', 'google/gemini-2.5-flash-lite', 'google/gemini-3.5-flash', 'google/gemini-3.5-flash-lite'];
 async function api(path: string, body?: unknown) {
   const r = await fetch(path, body === undefined ? {} : { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Operation-Token': token.value }, body: JSON.stringify(body) });
@@ -43,10 +46,13 @@ async function createSession() {
 }
 async function command(action: string) { try { error.value = ''; await api(`/api/sessions/${selected.value}/${action}`, {}); } catch (e) { error.value = String(e); } }
 async function enterReplay() {
-  closeStream(); replayMode.value = true; maximum.value = view.value?.lastSeq ?? 0; cursor.value = 0; events.value = []; await seek();
+  closeStream(); replayMode.value = true; cursor.value = 0; playhead = 0; events.value = [];
+  try { const manifest = await api(`/api/sessions/${selected.value}/timeline`); timeline = manifest.entries; maximum.value = manifest.lastSeq; await seek(); }
+  catch (e) { error.value = String(e); }
 }
 let seekVersion = 0;
-async function seek() {
+async function seek(fromPlayback = false) {
+  if (fromPlayback !== true) playhead = timeline.find(e => e.commitSeq === cursor.value)?.logicalTimeMs ?? 0;
   const version = ++seekVersion; events.value = []; // Clear secret cache before any mode change/request.
   try {
     const next = await api(`/api/sessions/${selected.value}/replay?view=${god.value ? 'omniscient' : 'public'}&through=${cursor.value}`) as View;
@@ -71,7 +77,7 @@ function describe(e: PublicEvent): string {
 onMounted(async () => {
   try { const initial = await api('/api/bootstrap'); token.value = initial.token; hasKey.value = initial.hasKey; config.value = initial.config; await refreshList(); if (ids.value[0]) { selected.value = ids.value[0]; await watchSession(); } }
   catch (e) { error.value = String(e); }
-  timer = setInterval(() => { if (playing.value && replayMode.value) { if (cursor.value >= maximum.value) playing.value = false; else { cursor.value = Math.min(maximum.value, cursor.value + speed.value); void seek(); } } }, 700);
+  timer = setInterval(() => { if (playing.value && replayMode.value) { const next = advancePlayback(timeline, playhead, 250, speed.value); playhead = next.logicalTimeMs; if (next.cursor !== cursor.value) { cursor.value = next.cursor; void seek(true); } if (next.ended) playing.value = false; } }, 250);
 });
 onUnmounted(() => { closeStream(); clearInterval(timer); });
 </script>
@@ -93,7 +99,7 @@ onUnmounted(() => { closeStream(); clearInterval(timer); });
         </section>
         <section class="feed panel"><div class="section-top"><span class="eyebrow">EVENT JOURNAL</span><span>{{ god && replayMode ? '上帝視角' : '限知視角' }}</span></div><h2>言語與暗流<span>{{ events.length }} EVENTS</span></h2><div class="event-list" aria-live="polite"><p v-if="!events.length" class="empty">尚無事件。沉默也可能是一種選擇。</p><article v-for="e in events" :key="e.eventId" class="event" :class="{ private: e.type === 'private_message_sent' }"><div class="event-meta"><time>{{ time(e.logicalTimeMs) }}</time><b>{{ e.publicPayload.sender ?? e.publicPayload.actorId ?? 'SYSTEM' }}<template v-if="e.publicPayload.recipient"> → {{ e.publicPayload.recipient }}</template></b><span>{{ e.type === 'private_message_sent' ? '私訊' : e.type === 'public_message' ? '公開' : '紀錄' }}</span></div><p>{{ describe(e) }}</p><details v-if="e.type === 'strategy_note'"><summary>查看原始備忘錄</summary><pre>{{ JSON.stringify(e.publicPayload.note, null, 2) }}</pre></details><small class="batch">批次 {{ e.batchId }} · #{{ e.commitSeq }}</small></article></div></section>
       </div>
-      <section v-if="replayMode" class="replay panel"><div class="section-top"><span class="eyebrow">REPLAY / 原始事件存檔</span><label><input v-model="god" type="checkbox" @change="seek"> 解鎖私訊與策略</label></div><div class="replay-controls"><button @click="playing = !playing">{{ playing ? '暫停' : '播放' }}</button><input v-model.number="cursor" aria-label="重播事件位置" type="range" min="0" :max="maximum" @input="playing = false; seek()"><span>{{ cursor }} / {{ maximum }}</span><select v-model.number="speed" aria-label="播放速度"><option :value="1">1×</option><option :value="2">2×</option><option :value="5">5×</option></select></div></section>
+      <section v-if="replayMode" class="replay panel"><div class="section-top"><span class="eyebrow">REPLAY / 原始事件存檔</span><label><input v-model="god" type="checkbox" @change="seek()"> 解鎖私訊與策略</label></div><div class="replay-controls"><button @click="playing = !playing">{{ playing ? '暫停' : '播放' }}</button><input v-model.number="cursor" aria-label="重播事件位置" type="range" min="0" :max="maximum" @input="playing = false; seek()"><span>{{ cursor }} / {{ maximum }}</span><select v-model.number="speed" aria-label="播放速度"><option :value="1">1×</option><option :value="2">2×</option><option :value="5">5×</option><option :value="16">16×</option></select></div></section>
       <section v-if="config" class="setup panel"><div class="section-top"><span class="eyebrow">NEXT SESSION</span><span>每席不同模型 · 規則一致</span></div><h2>下一場，由誰入席？</h2><div class="model-grid"><label v-for="id in config.players" :key="id">席位 {{ id }}<select v-model="config.seatModels[id].model" @change="config.seatModels[id].displayName = config.seatModels[id].model.split('/')[1]"><option v-for="m in models" :key="m" :value="m">{{ m.split('/')[1] }}</option></select></label></div><div class="setup-bottom"><span class="muted">{{ config.rounds }} 回合 · {{ config.scoring.policy === 'exclusive' ? '獨占獎勵' : '零和轉移' }} · {{ config.scheduling.mode }}<br><small v-if="!hasKey">尚未設定 OPENROUTER_API_KEY；仍可建立對局與查看歷史。</small></span><button class="primary" @click="createSession">建立新對局 ＋</button></div></section>
       <footer>MINORITY PACT <span>無劇本。無預設勝者。只保留當時發生的事。</span><span>LOCAL OBSERVATORY — V0.1</span></footer>
     </main>

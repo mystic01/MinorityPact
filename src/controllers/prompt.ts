@@ -29,3 +29,21 @@ export const DECISION_SCHEMA = obj({
   nextWake: obj({ atGameTimeMs: { anyOf: [number, { type: 'null' }] }, onEvents: { type: 'array', items: { type: 'string', enum: ['private_message_received', 'public_message_received'] } } }),
   strategyNote: obj({ goal: str, plan: str, whyThisAction: str, predictedOutcome: str, observedEventIds: { type: 'array', items: str }, revisionReason: { type: ['string', 'null'] } }),
 });
+export function decisionSchemaFor(input: { phase: string; logicalTimeMs: number; publicRules: string }) {
+  const schema = structuredClone(DECISION_SCHEMA) as any;
+  const rules = JSON.parse(input.publicRules) as Record<string, any>;
+  const branches = schema.properties.actions.items.anyOf as any[];
+  schema.properties.actions.items.anyOf = branches.filter(b => input.phase === 'commit' ? b.properties.type.const === 'vote' : b.properties.type.const !== 'vote');
+  for (const b of schema.properties.actions.items.anyOf) {
+    if (input.phase === 'commit') b.properties.scheduledTimeMs = { type: 'integer', const: input.logicalTimeMs };
+    else {
+      const width = rules.scheduling?.mode === 'fixed_5s' ? 5000 : rules.scheduling?.mode === 'fixed_15s' ? 15000 : 1;
+      const start = rules.roundStartedMs ?? 0;
+      const deadline = rules.negotiationDeadlineMs;
+      b.properties.scheduledTimeMs = { type: 'integer', minimum: input.logicalTimeMs,
+        ...(typeof deadline === 'number' ? { maximum: start + Math.floor((deadline - start - 1) / width) * width } : {}) };
+    }
+  }
+  if (input.phase === 'commit') { schema.properties.actions.minItems = 1; schema.properties.actions.maxItems = 1; }
+  return schema;
+}

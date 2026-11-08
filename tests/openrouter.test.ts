@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { OpenRouterController } from '../src/controllers/openrouter.ts';
-import { SYSTEM_PROMPT } from '../src/controllers/prompt.ts';
+import { SYSTEM_PROMPT, decisionSchemaFor } from '../src/controllers/prompt.ts';
 import { SqliteEventStore } from '../src/infrastructure/sqlite-store.ts';
 import { DecisionCoordinator } from '../src/application/coordinator.ts';
 import { parseConfig } from '../src/domain/config.ts';
@@ -11,6 +11,14 @@ const config = () => parseConfig({ ...JSON.parse(readFileSync(new URL('../config
 const input: DecisionInput = { sessionId: 's', round: 1, phase: 'negotiation', logicalTimeMs: 0, batchId: 'b', snapshotId: 'snap', agentId: 'A', rulesVersion: 'v1', publicRules: '{}', standings: [], history: [], privateMessages: [], ownNotes: [], wakeReasons: ['phase_started'] };
 const answer = () => ({ actions: [], nextWake: { atGameTimeMs: null, onEvents: [] }, strategyNote: { goal: 'win', plan: 'wait', whyThisAction: 'observe', predictedOutcome: 'unknown', observedEventIds: [], revisionReason: null } });
 const response = (content = JSON.stringify(answer()), model = 'test/model', finish = 'stop') => Response.json({ model, choices: [{ finish_reason: finish, message: { content } }], usage: { total_tokens: 20 } });
+test('per-decision schema excludes wrong-phase votes and execution at rounded deadline', () => {
+  const schema = decisionSchemaFor({ phase: 'negotiation', logicalTimeMs: 10000, publicRules: JSON.stringify({ roundStartedMs: 0, negotiationDeadlineMs: 15000, scheduling: { mode: 'fixed_5s' } }) });
+  const branches = schema.properties.actions.items.anyOf;
+  assert.ok(branches.every((b: any) => b.properties.type.const !== 'vote' && b.properties.scheduledTimeMs.maximum === 10000));
+  const commit = decisionSchemaFor({ phase: 'commit', logicalTimeMs: 15000, publicRules: '{}' });
+  assert.equal(commit.properties.actions.maxItems, 1);
+  assert.equal(commit.properties.actions.items.anyOf[0].properties.scheduledTimeMs.const, 15000);
+});
 test('adapter sends configured model, same system prompt and strict schema; audits without key', async () => {
   const audits: Record<string, unknown>[] = [];
   const stub: typeof fetch = async (url, options) => {
