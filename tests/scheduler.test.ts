@@ -11,6 +11,40 @@ const config = (mode: 'fixed_5s' | 'fixed_15s' = 'fixed_5s') => parseConfig({ ..
 const result = (i: DecisionInput): DecisionResult => ({ actions: i.phase === 'commit' ? [{ type: 'vote', actionId: 'v', color: i.agentId === 'A' ? 'red' : 'blue', scheduledTimeMs: i.logicalTimeMs }] : [], nextWake: { onEvents: [] }, strategyNote: { goal: 'win', plan: 'observe', whyThisAction: 'wait', predictedOutcome: 'unknown', observedEventIds: [] } });
 const pace = async (_: number) => {};
 
+test('responsive policy wakes private recipient once, persists periodic review and stops negotiation at 50 seconds', async () => {
+  const c = config(); c.negotiationTimeMs = 50000;
+  c.scheduling.privateMessageWake = 'always'; c.scheduling.reconsiderAfterMs = 15000;
+  const store = new SqliteEventStore(':memory:'); store.createSession('responsive', c);
+  const seen: Record<string, DecisionInput[]> = {};
+  const controllers = Object.fromEntries(c.players.map(id => [id, { decide: async (i: DecisionInput) => {
+    (seen[id] ??= []).push(structuredClone(i)); const r = result(i);
+    if (id === 'A' && i.logicalTimeMs === 0) r.actions = [
+      { type: 'send_private_message', actionId: 'p1', recipientId: 'D', message: 'PRIVATE_NEW', scheduledTimeMs: 0 },
+      { type: 'send_private_message', actionId: 'p2', recipientId: 'D', message: 'PRIVATE_SECOND', scheduledTimeMs: 0 },
+      { type: 'send_public_message', actionId: 'pub', message: 'PUBLIC_NEW', scheduledTimeMs: 0 },
+    ];
+    return r;
+  } }]));
+  try {
+    await new DecisionCoordinator(store, 'responsive', controllers).step(pace);
+    await new DecisionCoordinator(store, 'responsive', controllers).step(pace);
+    assert.deepEqual(seen.D?.map(i => i.logicalTimeMs), [0, 5000]);
+    assert.equal(seen.B?.length, 1); // Public message alone does not override unsubscribe.
+    const d = seen.D![1]!;
+    assert.ok(d.newEventIds?.length);
+    assert.ok(d.history.some(e => d.newEventIds!.includes(e.eventId) && e.publicPayload.body === 'PRIVATE_NEW'));
+    for (let n = 0; n < 12; n++) {
+      await new DecisionCoordinator(store, 'responsive', controllers).step(pace);
+      if (seen.A?.some(i => i.phase === 'commit')) break;
+    }
+    assert.deepEqual(seen.A?.filter(i => i.phase === 'negotiation').map(i => i.logicalTimeMs), [0, 15000, 30000, 45000]);
+    assert.deepEqual(seen.D?.filter(i => i.phase === 'negotiation').map(i => i.logicalTimeMs), [0, 5000, 20000, 35000]);
+    assert.ok(seen.A?.find(i => i.logicalTimeMs === 15000)?.wakeReasons.includes('periodic_reconsideration'));
+    assert.equal(seen.A?.find(i => i.phase === 'commit')?.logicalTimeMs, 50000);
+    assert.ok(!JSON.stringify(seen.B).includes('PRIVATE_NEW'));
+  } finally { store.close(); }
+});
+
 for (const type of ['send_public_message', 'send_private_message'] as const) test(`immediate policy rejects future ${type} without publishing peers`, async () => {
   const store = new SqliteEventStore(':memory:'); store.createSession('s', config());
   const controllers = Object.fromEntries(config().players.map(id => [id, { decide: async (i: DecisionInput) => {

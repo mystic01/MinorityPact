@@ -6,7 +6,7 @@ export interface Rules {
 }
 export interface SessionConfig extends Rules {
   schemaVersion: 1; experimental: true; rulesVersion: string; promptVersion: string; seed: string;
-  scheduling: { mode: 'fixed_5s' | 'fixed_15s' | 'event_driven'; eventReactionMs: number };
+  scheduling: { mode: 'fixed_5s' | 'fixed_15s' | 'event_driven'; eventReactionMs: number; privateMessageWake?: 'always' | 'subscribed'; reconsiderAfterMs?: number };
   llm: { provider: 'openrouter'; model: string; displayName?: string; parameters: Record<string, unknown> };
   seatModels?: Record<string, { model: string; displayName?: string }>;
 }
@@ -22,7 +22,7 @@ export function parseConfig(value: unknown): SessionConfig {
   if (scoring.policy === 'exclusive' && scoring.majority !== 0) throw new Error('Exclusive majority must be zero');
   if (scoring.policy === 'zero_sum' && (scoring.solo + 4 * scoring.majority !== 0 || 2 * scoring.pair + 3 * scoring.majority !== 0)) throw new Error('Not zero sum');
   const p = object(v.policies); keys(p, ['ready', 'vote', 'simultaneous', 'messageTiming']);
-  const t = object(v.scheduling); keys(t, ['mode', 'eventReactionMs']);
+  const t = object(v.scheduling); keys(t, ['mode', 'eventReactionMs', 'privateMessageWake', 'reconsiderAfterMs']);
   const l = object(v.llm); keys(l, ['provider', 'model', 'displayName', 'parameters']);
   const parameters = object(l.parameters);
   // Do not permit credentials or per-seat/provider overrides in common parameters.
@@ -52,7 +52,7 @@ export function parseConfig(value: unknown): SessionConfig {
     schemaVersion: 1, experimental: true, players, rounds, negotiationTimeMs: integer(v.negotiationTimeMs, 1),
     rulesVersion: text(v.rulesVersion), promptVersion: text(v.promptVersion), seed: text(v.seed), scoring,
     policies: { ready: oneOf(p.ready, ['revocable_quiet_batch']), vote: oneOf(p.vote, ['commit_once']), simultaneous: oneOf(p.simultaneous, ['next_batch']), ...(p.messageTiming === undefined ? {} : { messageTiming: oneOf(p.messageTiming, ['immediate', 'scheduled']) }) },
-    scheduling: { mode: oneOf(t.mode, ['fixed_5s', 'fixed_15s', 'event_driven']), eventReactionMs: integer(t.eventReactionMs, 1) },
+    scheduling: { mode: oneOf(t.mode, ['fixed_5s', 'fixed_15s', 'event_driven']), eventReactionMs: integer(t.eventReactionMs, 1), ...(t.privateMessageWake === undefined ? {} : { privateMessageWake: oneOf(t.privateMessageWake, ['always', 'subscribed']) }), ...(t.reconsiderAfterMs === undefined ? {} : { reconsiderAfterMs: integer(t.reconsiderAfterMs, 1) }) },
     llm: { provider: oneOf(l.provider, ['openrouter']), model: text(l.model), parameters: structuredClone(parameters), ...(l.displayName === undefined ? {} : { displayName: text(l.displayName) }) },
   };
 }

@@ -51,7 +51,7 @@ export class DecisionCoordinator {
     if (!cp.pendingDecisions.length) {
       if (state.phase === 'reveal' || state.phase === 'negotiation' && time >= deadline) {
         for (const p of cp.pendingActions) this.store.recordAudit(this.sessionId, p.decisionId, { kind: 'scheduled_action_cancelled', actionId: p.action.actionId, reason: 'phase_transition' });
-        cp.pendingActions = []; cp.subscriptions = {}; cp.wakeQueue = {}; cp.initialized = false;
+        cp.pendingActions = []; cp.subscriptions = {}; cp.wakeQueue = {}; cp.reconsiderDue = {}; cp.initialized = false;
         await this.save(cp, resolveBatch(state, { batchId, logicalTimeMs: time, actions: [], hasPendingMessages: false }));
         this.clock.resume(); return 'running';
       }
@@ -62,18 +62,19 @@ export class DecisionCoordinator {
         this.queueWakes(events, cp, config, state);
         await this.save(cp, events); history = await this.store.readEvents(this.sessionId, 0);
         state = history.reduce((s, e) => reduce(s, e.data), createGame(this.sessionId, config));
-        if (state.phase !== 'negotiation') { cp.initialized = false; cp.subscriptions = {}; cp.wakeQueue = {}; }
+        if (state.phase !== 'negotiation') { cp.initialized = false; cp.subscriptions = {}; cp.wakeQueue = {}; cp.reconsiderDue = {}; }
       }
       const order = [...config.players].sort((a, b) => {
         const key = (id: string) => createHash('sha256').update(JSON.stringify([config.seed, batchId, id])).digest('hex');
         return key(a).localeCompare(key(b));
       });
-      const actors = order.filter(id => !cp.initialized || state.phase === 'commit' && !state.votes[id] || (cp.subscriptions[id]?.atGameTimeMs ?? Infinity) <= time || (cp.wakeQueue?.[id] ?? Infinity) <= time);
+      const actors = order.filter(id => !cp.initialized || state.phase === 'commit' && !state.votes[id] || (cp.subscriptions[id]?.atGameTimeMs ?? Infinity) <= time || (cp.wakeQueue?.[id] ?? Infinity) <= time || (cp.reconsiderDue?.[id] ?? Infinity) <= time);
       cp.pendingDecisions = actors.map(agentId => {
         const wakeReasons = [
           ...(!cp.initialized ? ['phase_started'] : []),
           ...((cp.subscriptions[agentId]?.atGameTimeMs ?? Infinity) <= time ? ['scheduled_time_due'] : []),
-          ...((cp.wakeQueue?.[agentId] ?? Infinity) <= time ? ['subscribed_event_received'] : []),
+          ...((cp.wakeQueue?.[agentId] ?? Infinity) <= time ? ['message_received'] : []),
+          ...((cp.reconsiderDue?.[agentId] ?? Infinity) <= time ? ['periodic_reconsideration'] : []),
         ];
         delete cp.wakeQueue?.[agentId];
         if (cp.subscriptions[agentId]) delete cp.subscriptions[agentId]!.atGameTimeMs;
@@ -82,6 +83,7 @@ export class DecisionCoordinator {
         const input: DecisionInput = { sessionId: this.sessionId, round: state.round, phase: state.phase, logicalTimeMs: time, batchId, snapshotId, agentId,
           rulesVersion: config.rulesVersion, publicRules: JSON.stringify({ objective: 'unique final champion; second place has no victory value', ranking: ['total_score_desc', 'minority_wins_desc', 'draw'], players: config.players, rounds: config.rounds, scoring: config.scoring, roundStartedMs: state.roundStartedMs, negotiationDeadlineMs: state.roundStartedMs + config.negotiationTimeMs, negotiationTimeMs: config.negotiationTimeMs, policies: config.policies, scheduling: config.scheduling }),
           standings: structuredClone(state.standings), history: visible,
+          newEventIds: visible.filter(e => e.commitSeq > (cp.lastObservedSeq?.[agentId] ?? 0)).map(e => e.eventId),
           privateMessages: history.flatMap(e => e.data.type === 'private_message_sent' && [e.data.actorId, e.data.recipientId].includes(agentId) ? [{ eventId: e.eventId, sender: e.data.actorId, recipient: e.data.recipientId, body: e.data.body }] : []),
           ownNotes: history.flatMap(e => e.data.type === 'strategy_note' && e.data.actorId === agentId ? [e.data.note] : []), wakeReasons };
         return { decisionId: snapshotId, snapshot: { snapshotId, input } };
@@ -117,8 +119,11 @@ export class DecisionCoordinator {
       const result = p.result!; const actorId = p.snapshot.input.agentId;
       events.push({ type: 'strategy_note', actorId, note: result.strategyNote, batchId, logicalTimeMs: time });
       cp.subscriptions[actorId] = structuredClone(result.nextWake);
+      (cp.lastObservedSeq ??= {})[actorId] = p.snapshot.input.history.at(-1)?.commitSeq ?? 0;
+      if (state.phase === 'negotiation' && config.scheduling.reconsiderAfterMs !== undefined)
+        (cp.reconsiderDue ??= {})[actorId] = alignTime(time + config.scheduling.reconsiderAfterMs, config, state.roundStartedMs);
       if (cp.subscriptions[actorId]!.atGameTimeMs !== undefined) cp.subscriptions[actorId]!.atGameTimeMs = alignTime(cp.subscriptions[actorId]!.atGameTimeMs!, config, state.roundStartedMs);
-      for (const action of result.actions) cp.pendingActions.push({ actorId, decisionId: p.decisionId, action: { ...action, actionId: `${p.decisionId}/${action.actionId}`, scheduledTimeMs: alignTime(action.scheduledTimeMs, config, state.roundStartedMs) } });
+      for (const action of result.actions) cp.pendingActions.push({ actorId, decisionId: p.decisionId, action: { ...action, actionId: `${p.decisionId}/${action.actionId}`, scheduledTimeMs: state.phase === 'commit' ? time : alignTime(action.scheduledTimeMs, config, state.roundStartedMs) } });
     }
     const immediate = cp.pendingActions.filter(p => p.action.scheduledTimeMs === time);
     cp.pendingActions = cp.pendingActions.filter(p => p.action.scheduledTimeMs > time);
@@ -126,7 +131,7 @@ export class DecisionCoordinator {
     events.push(...resolved); this.queueWakes(resolved, cp, config, state);
     if (resolved.some(e => e.type === 'phase_changed')) {
       for (const p of cp.pendingActions) this.store.recordAudit(this.sessionId, p.decisionId, { kind: 'scheduled_action_cancelled', actionId: p.action.actionId, reason: 'phase_transition' });
-      cp.initialized = false; cp.pendingActions = []; cp.subscriptions = {}; cp.wakeQueue = {};
+      cp.initialized = false; cp.pendingActions = []; cp.subscriptions = {}; cp.wakeQueue = {}; cp.reconsiderDue = {};
     }
     cp.completedDecisions = [...(cp.completedDecisions ?? []), ...cp.pendingDecisions]; cp.pendingDecisions = [];
     await this.save(cp, events); this.clock.resume(); return 'running';
@@ -135,7 +140,7 @@ export class DecisionCoordinator {
     cp.wakeQueue ??= {};
     for (const e of events) for (const id of c.players) {
       const kind = e.type === 'private_message_sent' && e.recipientId === id ? 'private_message_received' : e.type === 'public_message' && e.actorId !== id ? 'public_message_received' : null;
-      if (kind && cp.subscriptions[id]?.onEvents.includes(kind)) cp.wakeQueue[id] = Math.min(cp.wakeQueue[id] ?? Infinity, alignTime(cp.logicalTimeMs + c.scheduling.eventReactionMs, c, state.roundStartedMs));
+      if (kind && (cp.subscriptions[id]?.onEvents.includes(kind) || kind === 'private_message_received' && c.scheduling.privateMessageWake === 'always')) cp.wakeQueue[id] = Math.min(cp.wakeQueue[id] ?? Infinity, alignTime(cp.logicalTimeMs + c.scheduling.eventReactionMs, c, state.roundStartedMs));
     }
   }
   private validate(r: DecisionResult, input: DecisionInput, s: GameState, c: SessionConfig): void {

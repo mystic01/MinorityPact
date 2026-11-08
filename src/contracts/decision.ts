@@ -16,6 +16,7 @@ export interface DecisionInput {
   sessionId: string; round: number; phase: Phase; logicalTimeMs: number; batchId: string;
   snapshotId: string; agentId: AgentId; rulesVersion: string; publicRules: string;
   standings: Standing[]; history: PublicEvent[];
+  newEventIds?: string[];
   privateMessages: { eventId: string; sender: AgentId; recipient: AgentId; body: string }[];
   ownNotes: StrategyNote[]; wakeReasons: string[];
 }

@@ -113,7 +113,7 @@ test('mock HTTP five-controller ten-round integration persists raw responses and
     const coordinator = new DecisionCoordinator(store, 's', controllers);
     let completed = false;
     for (let n = 0; n < 100; n++) if (await coordinator.step(async () => {}) === 'completed') { completed = true; break; }
-    assert.ok(completed); assert.equal(store.readAudit('s').length, 100);
+    assert.ok(completed); assert.equal(store.readAudit('s').length, 250);
     assert.ok(store.readAudit('s').every(r => r.success === true && typeof r.rawResponse === 'string'));
     assert.ok(!JSON.stringify(store.readAudit('s')).includes('TEST_SECRET'));
     assert.equal((await store.readEvents('s', 0)).at(-1)?.data.type, 'game_ended');

@@ -3,6 +3,8 @@ import type { DecisionInput, DecisionResult, NextWake } from '../contracts/decis
 export interface DecisionSnapshot { snapshotId: string; input: DecisionInput }
 export interface SchedulerCheckpoint {
   initialized?: boolean;
+  reconsiderDue?: Record<string, number>;
+  lastObservedSeq?: Record<string, number>;
   wakeQueue?: Record<string, number>;
   completedDecisions?: SchedulerCheckpoint['pendingDecisions'];
   logicalTimeMs: number;

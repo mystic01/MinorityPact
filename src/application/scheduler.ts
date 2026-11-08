@@ -8,7 +8,7 @@ export function alignTime(time: number, config: SessionConfig, roundStart: numbe
 export function nextBoundary(state: GameState, cp: SchedulerCheckpoint, config: SessionConfig): number {
   if (!cp.initialized || cp.pendingDecisions.length || state.phase === 'commit' || state.phase === 'reveal') return cp.logicalTimeMs;
   const deadline = state.roundStartedMs + config.negotiationTimeMs;
-  const times = [deadline, ...cp.pendingActions.map(p => p.action.scheduledTimeMs), ...Object.values(cp.wakeQueue ?? {}),
+  const times = [deadline, ...Object.values(cp.reconsiderDue ?? {}), ...cp.pendingActions.map(p => p.action.scheduledTimeMs), ...Object.values(cp.wakeQueue ?? {}),
     ...Object.values(cp.subscriptions).flatMap(w => w.atGameTimeMs === undefined ? [] : [w.atGameTimeMs])];
   if (config.players.every(id => state.ready[id])) times.push(alignTime(cp.logicalTimeMs + config.scheduling.eventReactionMs, config, state.roundStartedMs));
   return Math.min(...times.filter(t => t >= cp.logicalTimeMs));
