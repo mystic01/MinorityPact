@@ -59,5 +59,9 @@ export function parseConfig(value: unknown): SessionConfig {
 export function modelForSeat(config: SessionConfig, id: string): SessionConfig['llm'] {
   if (!config.players.includes(id)) throw new Error('Unknown seat');
   const seat = config.seatModels?.[id];
-  return { ...config.llm, ...(seat ? { model: seat.model, displayName: seat.displayName ?? seat.model } : {}), parameters: structuredClone(config.llm.parameters) };
+  const model = seat?.model ?? config.llm.model;
+  const parameters = structuredClone(config.llm.parameters);
+  // GLM 5.3 defaults to max reasoning upstream; keep a bounded output budget usable.
+  if (/^z-ai\/glm-5\.3(?:-flash)?$/.test(model) && parameters.reasoning === undefined) parameters.reasoning = { effort: 'low' };
+  return { ...config.llm, ...(seat ? { model: seat.model, displayName: seat.displayName ?? seat.model } : {}), parameters };
 }

@@ -6,12 +6,29 @@ import { DecisionCoordinator } from '../src/application/coordinator.ts';
 import { GameClock } from '../src/application/clock.ts';
 import { parseConfig } from '../src/domain/config.ts';
 import type { AgentController, DecisionInput, DecisionResult } from '../src/contracts/decision.ts';
+import { ProviderDecisionError } from '../src/controllers/openrouter.ts';
 const config = (mode: 'fixed_5s' | 'fixed_15s' = 'fixed_5s') => parseConfig({ ...JSON.parse(readFileSync(new URL('../configs/experimental.json', import.meta.url), 'utf8')), scheduling: { mode, eventReactionMs: 1000 }, llm: { provider: 'openrouter', model: 'test/model', parameters: {} } });
 const result = (i: DecisionInput): DecisionResult => ({ actions: i.phase === 'commit' ? [{ type: 'vote', actionId: 'v', color: i.agentId === 'A' ? 'red' : 'blue', scheduledTimeMs: i.logicalTimeMs }] : [], nextWake: { onEvents: [] }, strategyNote: { goal: 'win', plan: 'observe', whyThisAction: 'wait', predictedOutcome: 'unknown', observedEventIds: [] } });
 const pace = async (_: number) => {};
 test('clock remains frozen across arbitrary wall time', () => {
   let wall = 0; const c = new GameClock(0, () => wall); wall = 5; assert.equal(c.read(), 5);
   c.pause(); wall = 99999; assert.equal(c.read(), 5); c.resume(); wall += 3; assert.equal(c.read(), 8);
+});
+test('token exhaustion stops after one attempt and retains successful peer results', async () => {
+  const store = new SqliteEventStore(':memory:'); store.createSession('s', config());
+  const calls: Record<string, number> = {};
+  const controllers = Object.fromEntries(config().players.map(id => [id, { decide: async (i: DecisionInput) => {
+    calls[id] = (calls[id] ?? 0) + 1;
+    if (id === 'E') throw new ProviderDecisionError('output_token_limit', false);
+    return result(i);
+  } }]));
+  try {
+    await assert.rejects(new DecisionCoordinator(store, 's', controllers).step(pace), /paused_error/);
+    assert.equal(calls.E, 1);
+    const cp = await store.loadCheckpoint('s');
+    assert.equal(cp?.pendingDecisions.filter(p => p.result).length, 4);
+    assert.ok(store.readAudit('s').some(a => a.code === 'output_token_limit'));
+  } finally { store.close(); }
 });
 test('missing goal-change reason pauses without discarding peers; corrected reason resumes original snapshot', async () => {
   const store = new SqliteEventStore(':memory:'); store.createSession('s', config());

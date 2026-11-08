@@ -1,5 +1,9 @@
 # 實作進度 — 2026-11-08
 
+截斷修復驗證：97項離線測試、typecheck、web:check、build及scripted Chrome QA全部通過；測試確認token額度耗盡只嘗試一次、保留另外四席結果，GLM低推理預設不覆蓋使用者顯式設定。不呼叫付費API，服務須重啟後載入。
+
+最新截斷修復：新局ce3b730a在第1回合等待E（GLM5.3），三次finish_reason=length，4096 completion tokens全為reasoning，無完整JSON；其餘四席已成功。modelForSeat對GLM5.3/Flash在使用者未指定reasoning時加low，保留4096上限及顯式設定。ProviderDecisionError分類輸出截斷／不可重試HTTP錯誤，coordinator不再對相同額度做三次無效重試；公開畫面僅顯示安全的額度錯誤說明，不洩漏個別策略／原文。沒有付費API驗證、不自動恢復對局。重啟服務後可由使用者重試E，四個已成功結果保留。原始API輸出及歷史不改寫。頭像資產另在製作中，不影響此修復。
+
 本次預設模型修改驗證：typecheck、web:check、build、94項離線測試與Chrome scripted QA全部通過，沒有付費API呼叫。
 
 最新五席預設：依使用者確認改成A GLM5.3Flash、B Qwen3.8Flash、C DeepSeekV3.2、D Gemini2.5FlashLite、E GLM5.3，新增至網頁模型選單並保留原Gemini選項。新局共同max_tokens暫設4096，避免先前65536預留問題；舊局設定與歷史不改動。服務重新啟動後建立新局生效，若另設GAME_CONFIG需同步調整該檔。不呼叫付費API驗證。

@@ -14,6 +14,13 @@ test('five seat models are distinct, configurable, and frozen per saved session'
   try { store.createSession('s', c); c.seatModels!.A!.model = 'changed'; assert.notEqual(modelForSeat(store.getConfig('s'), 'A').model, 'changed'); }
   finally { store.close(); }
 });
+test('GLM uses low reasoning by default while explicit user reasoning is preserved', () => {
+  const c = config();
+  assert.deepEqual(modelForSeat(c, 'E').parameters.reasoning, { effort: 'low' });
+  c.llm.parameters.reasoning = { effort: 'high' };
+  assert.deepEqual(modelForSeat(c, 'E').parameters.reasoning, { effort: 'high' });
+  assert.equal(modelForSeat(c, 'E').parameters.max_tokens, 4096);
+});
 test('local HTTP operations enforce origin/token; public snapshots/SSE do not disclose secrets', async () => {
   const store = new SqliteEventStore(':memory:'); store.createSession('s', config());
   await store.commitBatch({ sessionId: 's', batchId: 'b', expectedVersion: 0, checkpoint: { logicalTimeMs: 0, subscriptions: {}, pendingActions: [], pendingDecisions: [] }, events: [{ eventId: 'e1', sessionId: 's', round: 1, phase: 'negotiation', schemaVersion: 1, batchId: 'b', commitSeq: 1, logicalTimeMs: 0, data: { type: 'private_message_sent', actorId: 'A', recipientId: 'B', body: 'SECRET_SENTINEL', logicalTimeMs: 0, batchId: 'b' } }] });

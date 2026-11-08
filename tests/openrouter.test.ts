@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { OpenRouterController } from '../src/controllers/openrouter.ts';
+import { OpenRouterController, ProviderDecisionError } from '../src/controllers/openrouter.ts';
 import { SYSTEM_PROMPT, decisionSchemaFor } from '../src/controllers/prompt.ts';
 import { SqliteEventStore } from '../src/infrastructure/sqlite-store.ts';
 import { DecisionCoordinator } from '../src/application/coordinator.ts';
@@ -74,6 +74,12 @@ test('aborted network request is audited without leaking original error', async 
   const abort = new AbortController(); abort.abort();
   await assert.rejects(controller.decide(input, abort.signal), /inspect private audit/);
   assert.equal(audits.length, 1);
+});
+test('truncated output is a nonretryable token-budget error', async () => {
+  const audits: Record<string, unknown>[] = [];
+  const controller = new OpenRouterController(config().llm, 'TEST_SECRET', (_, r) => audits.push(r), async () => response('', 'test/model', 'length'));
+  await assert.rejects(controller.decide(input, new AbortController().signal), e => e instanceof ProviderDecisionError && e.code === 'output_token_limit' && e.retryable === false);
+  assert.equal(audits[0]?.code, 'output_token_limit');
 });
 test('mock HTTP five-controller ten-round integration persists raw responses and finishes', async () => {
   const store = new SqliteEventStore(':memory:'); const c = config(); store.createSession('s', c);

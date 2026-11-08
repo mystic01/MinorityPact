@@ -103,7 +103,8 @@ export class DecisionCoordinator {
         } catch (error) {
           const reason = error instanceof Error && ['Unknown observed event', 'Goal change needs reason', 'Wake must be in future', 'Commit requires one vote', 'Invalid action time', 'Action outside negotiation', 'Invalid recipient'].includes(error.message) ? error.message : 'Output format invalid or provider unavailable';
           pending.validationFeedback = `Previous output was rejected: ${reason}. Follow the exact action schema, current phase and legal scheduledTimeMs. Do not invent action types. Keep the same game snapshot; no new game information is available.`;
-          this.store.recordAudit(this.sessionId, pending.snapshot.snapshotId, { kind: 'decision_rejected', attempt: attempt + 1, reason: error instanceof Error ? error.message : 'Unknown error' });
+          this.store.recordAudit(this.sessionId, pending.snapshot.snapshotId, { kind: 'decision_rejected', attempt: attempt + 1, reason: error instanceof Error ? error.message : 'Unknown error', code: error && typeof error === 'object' && 'code' in error ? error.code : null });
+          if (error && typeof error === 'object' && 'retryable' in error && error.retryable === false) throw error;
           last = error;
         }
       }

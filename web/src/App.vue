@@ -3,7 +3,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue';
 import type { PublicView, PublicEvent } from '../../src/contracts/public.ts';
 import { advancePlayback } from '../../src/contracts/timeline.ts';
 import type { TimelineEntry } from '../../src/contracts/timeline.ts';
-type View = { state: PublicView; events: PublicEvent[]; lastSeq: number; status: string; clockTimeMs?: number };
+type View = { state: PublicView; events: PublicEvent[]; lastSeq: number; status: string; clockTimeMs?: number; errorMessage?: string };
 const token = ref(''), hasKey = ref(false), ids = ref<string[]>([]), selected = ref(''), config = ref<any>(null);
 const view = ref<View | null>(null), events = ref<PublicEvent[]>([]), error = ref(''), connected = ref(false);
 const replayMode = ref(false), god = ref(false), playing = ref(false), cursor = ref(0), maximum = ref(0), speed = ref(1);
@@ -89,7 +89,7 @@ onUnmounted(() => { closeStream(); clearInterval(timer); });
     <header><a class="brand" href="/">MP<span>少數者密約<small>MINORITY PACT / OBSERVATORY</small></span></a><div class="signal"><i :class="{ online: connected }"></i>{{ connected ? 'LIVE CONNECTED' : replayMode ? 'REPLAY ARCHIVE' : 'LOCAL SESSION' }}</div></header>
     <main>
       <div class="intro"><div><p class="eyebrow">FIVE MINDS. TWO COLORS. ONE CHAMPION.</p><h1>真心，藏在選擇之後。</h1><p class="muted">閱讀公開線索，追蹤私下往來。待終局，再回到真相發生的時刻。</p></div><span class="edition">EXPERIMENT<br><b>01 / 少數派</b></span></div>
-      <div v-if="error" class="notice" role="alert">{{ error }} <button @click="error = ''">關閉</button></div>
+      <div v-if="error || view?.errorMessage" class="notice" role="alert">{{ error || view?.errorMessage }} <button v-if="error" @click="error = ''">關閉</button></div>
       <section class="toolbar"><label>歷史對局 <select v-model="selected" @change="watchSession"><option value="">選擇對局</option><option v-for="id in ids" :key="id" :value="id">{{ id.slice(0, 12) }}</option></select></label><div class="actions"><button v-if="selected" @click="watchSession">即時視角</button><button :disabled="!state || state.phase !== 'completed'" @click="enterReplay">終局重播 ↗</button></div></section>
       <div class="dashboard">
         <section class="arena panel"><div class="section-top"><span class="eyebrow">THE TABLE</span><span v-if="state">ROUND {{ String(state.round).padStart(2, '0') }} / {{ state.rounds }}</span></div>
