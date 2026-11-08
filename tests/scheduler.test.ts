@@ -13,6 +13,30 @@ test('clock remains frozen across arbitrary wall time', () => {
   let wall = 0; const c = new GameClock(0, () => wall); wall = 5; assert.equal(c.read(), 5);
   c.pause(); wall = 99999; assert.equal(c.read(), 5); c.resume(); wall += 3; assert.equal(c.read(), 8);
 });
+test('missing goal-change reason pauses without discarding peers; corrected reason resumes original snapshot', async () => {
+  const store = new SqliteEventStore(':memory:'); store.createSession('s', config());
+  let repaired = false; const calls: Record<string, number> = {}; const snapshots: string[] = [];
+  const controllers = Object.fromEntries(config().players.map(id => [id, { decide: async (i: DecisionInput) => {
+    calls[id] = (calls[id] ?? 0) + 1; const r = result(i);
+    if (id === 'E' && i.logicalTimeMs === 0) r.nextWake.atGameTimeMs = 5000;
+    if (id === 'E' && i.logicalTimeMs === 5000) {
+      snapshots.push(JSON.stringify(i)); r.strategyNote.goal = '新的目標';
+      if (repaired) r.strategyNote.revisionReason = '根據已知局勢調整目標';
+    }
+    return r;
+  } }]));
+  try {
+    const coordinator = new DecisionCoordinator(store, 's', controllers);
+    await coordinator.step(pace);
+    await assert.rejects(coordinator.step(pace), /paused_error/);
+    assert.ok(store.readAudit('s').some(a => a.reason === 'Goal change needs reason'));
+    repaired = true; await new DecisionCoordinator(store, 's', controllers).step(pace);
+    assert.equal(new Set(snapshots).size, 1); assert.equal(calls.A, 1);
+    const notes = (await store.readEvents('s', 0)).filter(e => e.data.type === 'strategy_note' && e.data.actorId === 'E');
+    assert.equal(notes.length, 2);
+    assert.equal(store.readCompletedDecisions('s').length, 6);
+  } finally { store.close(); }
+});
 test('future message stays private until aligned execution boundary after coordinator restart', async () => {
   const store = new SqliteEventStore(':memory:'); store.createSession('s', config());
   const controllers = Object.fromEntries(config().players.map(id => [id, { decide: async (i: DecisionInput) => {

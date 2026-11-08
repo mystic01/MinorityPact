@@ -14,7 +14,7 @@ export class OpenRouterController implements AgentController {
     const body = { ...this.llm.parameters, model: this.llm.model, stream: false,
       provider: { require_parameters: true },
       messages: [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: JSON.stringify(input) },
-        { role: 'user', content: `${validationFeedback ?? 'Protocol reminder:'} Use EXACT action shapes from this JSON Schema. ${JSON.stringify(decisionSchemaFor(input))}` }],
+        { role: 'user', content: `${validationFeedback ?? 'Protocol reminder:'} ${input.ownNotes.length ? `目標延續規則：上次goal為${JSON.stringify(input.ownNotes.at(-1)!.goal)}。目標不變請逐字沿用；只要goal文字不同，就必須填寫非空白的revisionReason，不可為null。` : ''} Use EXACT action shapes from this JSON Schema. ${JSON.stringify(decisionSchemaFor(input))}` }],
       response_format: { type: 'json_schema', json_schema: { name: 'minority_decision', strict: true, schema: decisionSchemaFor(input) } } };
     const started = Date.now(); let responseBody: string | null = null; let status: number | null = null;
     const redact = (value: unknown): unknown => JSON.parse(JSON.stringify(value).split(this.key).join('[REDACTED]'));

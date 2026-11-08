@@ -13,7 +13,7 @@ During negotiation use send_public_message(message), send_private_message(recipi
 Only during commit submit exactly one vote(color red or blue), scheduled at the current logicalTimeMs; it cannot be changed. All five votes are revealed together.
 Each action requires a unique actionId within this decision and scheduledTimeMs. Do not use unlisted fields.
 Supply a concise strategyNote with goal, plan, whyThisAction, predictedOutcome and observedEventIds (only IDs actually in history). These are explicit summaries, not hidden chain-of-thought. Do not invent clever plans or explanations after the fact.
-When changing goal supply revisionReason. If you believe winning impossible you may choose another goal yourself; this never changes official ranking.
+When changing goal supply a nonempty revisionReason. If your goal is unchanged, copy your most recent ownNotes.goal EXACTLY, including punctuation; paraphrasing it counts as a change and requires revisionReason. If you believe winning impossible you may choose another goal yourself; this never changes official ranking.
 Return only the requested JSON object. Use null for absent optional time/revision fields.`;
 
 const str = { type: 'string' };
@@ -31,7 +31,7 @@ export const DECISION_SCHEMA = obj({
   nextWake: obj({ atGameTimeMs: { anyOf: [number, { type: 'null' }] }, onEvents: { type: 'array', items: { type: 'string', enum: ['private_message_received', 'public_message_received'] } } }),
   strategyNote: obj({ goal: humanText, plan: humanText, whyThisAction: humanText, predictedOutcome: humanText, observedEventIds: { type: 'array', items: str }, revisionReason: { type: ['string', 'null'], description: '變更目標的原因，必須使用繁體中文；未變更則為 null。' } }),
 });
-export function decisionSchemaFor(input: { phase: string; logicalTimeMs: number; publicRules: string }) {
+export function decisionSchemaFor(input: { phase: string; logicalTimeMs: number; publicRules: string; ownNotes?: { goal: string }[] }) {
   const schema = structuredClone(DECISION_SCHEMA) as any;
   const rules = JSON.parse(input.publicRules) as Record<string, any>;
   const branches = schema.properties.actions.items.anyOf as any[];
@@ -47,5 +47,13 @@ export function decisionSchemaFor(input: { phase: string; logicalTimeMs: number;
     }
   }
   if (input.phase === 'commit') { schema.properties.actions.minItems = 1; schema.properties.actions.maxItems = 1; }
+  const previousGoal = input.ownNotes?.at(-1)?.goal;
+  if (previousGoal !== undefined) {
+    const unchanged = structuredClone(schema.properties.strategyNote);
+    unchanged.properties.goal = { type: 'string', enum: [previousGoal], description: '目標未變更時，逐字沿用上次goal，不可改寫。' };
+    const changed = structuredClone(schema.properties.strategyNote);
+    changed.properties.revisionReason = { ...humanText, minLength: 1, pattern: '\\S', description: 'goal與上次不同（即使只是改寫）時，必須當下以繁體中文說明原因，不可為null或空白。' };
+    schema.properties.strategyNote = { anyOf: [unchanged, changed] };
+  }
   return schema;
 }

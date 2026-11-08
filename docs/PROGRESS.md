@@ -1,5 +1,9 @@
 # 實作進度 — 2026-11-08
 
+本次暫停修復驗證：typecheck、web:check通過，完整離線測試94項通過。服務尚未重啟、未自動恢復對局；重新啟動npm.cmd start後，使用者可按繼續對局，只重試未成功決策。
+
+暫停修復：本機games.sqlite最新paused_error局的API皆回200，連續被Goal change needs reason拒絕。原因是輸出schema容許revisionReason=null，但coordinator在goal文字改寫時要求原因。新增依該席最後goal產生的分支schema：沿用原goal或填非空白原因；提示亦要求未變目標逐字沿用。保留後端嚴格驗證、原始稽核與pending快照，不補寫模型原因、不自動恢復付費對局。以mock回歸測試驗證請求包含條件及原文且不修改快照。服務需重新啟動載入修正，再由使用者按繼續對局。
+
 最新語言修改：SYSTEM_PROMPT與JSON Schema的自然語言欄位要求繁體中文，涵蓋公開發言、私訊與策略備忘錄；即使歷史為英文仍用繁中回應，機器協定格式及原始歷史不改寫。新局預設promptVersion=v2-zh-TW。以既有mock測試檢查語言要求確實隨請求傳送、中文回應原樣解析；沒有付費API呼叫。
 
 本輪最終驗證：npm.cmd run typecheck、web:check、build全部通過；npm.cmd test 91項通過；scripted Chrome QA通過；實際main server啟動後HTTP200並已停止preview。正式使用執行npm.cmd start。未進行額外付費API驗證，真實smoke保持中途停止。

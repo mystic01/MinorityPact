@@ -11,6 +11,28 @@ const config = () => parseConfig({ ...JSON.parse(readFileSync(new URL('../config
 const input: DecisionInput = { sessionId: 's', round: 1, phase: 'negotiation', logicalTimeMs: 0, batchId: 'b', snapshotId: 'snap', agentId: 'A', rulesVersion: 'v1', publicRules: '{}', standings: [], history: [], privateMessages: [], ownNotes: [], wakeReasons: ['phase_started'] };
 const answer = () => ({ actions: [], nextWake: { atGameTimeMs: null, onEvents: [] }, strategyNote: { goal: '成為獨占冠軍', plan: '等待其他玩家的訊息', whyThisAction: '先觀察局勢', predictedOutcome: '目前仍不確定', observedEventIds: [], revisionReason: null } });
 const response = (content = JSON.stringify(answer()), model = 'test/model', finish = 'stop') => Response.json({ model, choices: [{ finish_reason: finish, message: { content } }], usage: { total_tokens: 20 } });
+test('goal continuation schema permits unchanged goal or requires nonempty reason for rewritten goal', () => {
+  const previousGoal = '成為獨占冠軍。';
+  const schema = decisionSchemaFor({ ...input, ownNotes: [{ goal: previousGoal }] });
+  const [unchanged, changed] = schema.properties.strategyNote.anyOf;
+  assert.deepEqual(unchanged.properties.goal.enum, [previousGoal]);
+  assert.equal(changed.properties.revisionReason.type, 'string');
+  assert.equal(changed.properties.revisionReason.minLength, 1);
+  assert.equal(new RegExp(changed.properties.revisionReason.pattern).test('   '), false);
+});
+test('adapter includes exact prior goal and reason requirement without rewriting persisted snapshot', async () => {
+  const original = { ...input, ownNotes: [{ ...answer().strategyNote, goal: '成為獨占冠軍。', revisionReason: '初始目標' }] };
+  const before = structuredClone(original);
+  const controller = new OpenRouterController(config().llm, 'TEST_SECRET', () => {}, async (_, options) => {
+    const request = JSON.parse(String(options?.body));
+    assert.ok(request.messages[2].content.includes('成為獨占冠軍。'));
+    assert.ok(request.messages[2].content.includes('不可為null'));
+    assert.equal(request.response_format.json_schema.schema.properties.strategyNote.anyOf.length, 2);
+    return response(JSON.stringify({ ...answer(), strategyNote: { ...answer().strategyNote, goal: '成為獨占冠軍。' } }));
+  });
+  await controller.decide(original, new AbortController().signal, 'Goal change needs reason');
+  assert.deepEqual(original, before);
+});
 test('per-decision schema excludes wrong-phase votes and execution at rounded deadline', () => {
   const schema = decisionSchemaFor({ phase: 'negotiation', logicalTimeMs: 10000, publicRules: JSON.stringify({ roundStartedMs: 0, negotiationDeadlineMs: 15000, scheduling: { mode: 'fixed_5s' } }) });
   const branches = schema.properties.actions.items.anyOf;
