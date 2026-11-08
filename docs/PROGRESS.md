@@ -1,5 +1,9 @@
 # 實作進度 — 2026-11-08
 
+劇場交涉UI完成：依使用者選定exec-ff17e970概念圖，改為五人並列、綠色橢圓牌桌、黃銅桌緣與獨立無人物溫室背景，導入既有透明表情PNG。PlayerSeat分離席位、頭像與參與者名稱，預留真人控制器；本次仍為觀戰版，未增加真人決策或修改遊戲規則。公開發言依序切換speaking與聚焦光暈，桌前／泡泡同步原文；公開揭曉得分後才用微笑／驚訝，私訊／策略／未揭曉投票不影響表情。換階段或重播清空發言；五席未揭曉均用中性鎖牌。新局設定可收合，右欄可篩選公開對話，手機三加二席位排列。背景以內建image_gen製作，提示及素材來源見docs/UI_THEATER.md。
+
+驗證：102項離線測試、typecheck、web:check、build通過。Chrome scripted QA確認五席頭像與發言表情、隱藏／揭曉選色、私訊不公開、終局重播解鎖與重新隱藏、320至1920寬度無頁面橫向溢出、計時器不遮蔽名牌或選色牌、無JS或靜態資源錯誤。已目視檢查桌機與手機截圖，測試使用scripted controller，未呼叫付費遊戲模型、未恢復既有局。下一步：重新整理已運行的本機網頁即可讀取新版dist；尚未啟動服務者執行npm.cmd start。真人席位後續需加入控制器等待／提交／逾時及玩家私有操作流程，不能只新增一個外觀按鈕。
+
 再次暫停的進一步診斷：ce3b730a仍停5000ms、B未完成，最新Qwen請求已帶reasoning.effort=low卻再次產生4096 reasoning tokens／finish_reason=length。前次low修正不足。唯讀查詢OpenRouter公開免金鑰GET /api/v1/models，Qwen3.8Flash的reasoning為mandatory:false、default_enabled:true、supports_max_tokens:true，未列supported_efforts；GLM5.3則明列max/high/low。依能力改用Qwen預設reasoning.max_tokens=1024，不再假定effort能限制Qwen用量；總max_tokens保持4096。自訂總額<=1024時預設effort:none，以免推理預算等於或超過總額；顯式使用者reasoning保持優先。未改寫既有遊戲／稽核、未呼叫付費生成API。官方參考：https://openrouter.ai/api/v1/models 與 https://openrouter.ai/docs/guides/best-practices/reasoning-tokens 。
 
 本次驗證：99項離線測試、typecheck、web:check通過，涵蓋舊局載入、數值預算、低總額處理、明確設定優先與成功席不重叫。下一步：Ctrl+C停止原服務後npm.cmd start，重新整理頁面再手動繼續B；不自動重試付費對局。尚未以實際付費請求驗證供應商遵守1024上限。UI僅製作三個圖片構想，尚未實作介面。
