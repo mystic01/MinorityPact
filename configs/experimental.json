@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "experimental": true,
+  "rulesVersion": "minority-pact-v1",
+  "promptVersion": "v1",
+  "seed": "experiment-1",
+  "players": ["A", "B", "C", "D", "E"],
+  "rounds": 10,
+  "negotiationTimeMs": 180000,
+  "scoring": { "policy": "exclusive", "solo": 5, "pair": 2, "majority": 0 },
+  "policies": { "ready": "revocable_quiet_batch", "vote": "commit_once", "simultaneous": "next_batch" },
+  "scheduling": { "mode": "fixed_5s", "eventReactionMs": 1000 },
+  "llm": { "provider": "openrouter", "model": "", "parameters": {} }
+}

@@ -1,0 +1,48 @@
+import { array, integer, keys, object, oneOf, text } from '../contracts/validation.ts';
+export interface Rules {
+  players: string[]; rounds: number; negotiationTimeMs: number;
+  scoring: { policy: 'exclusive' | 'zero_sum'; solo: number; pair: number; majority: number };
+  policies: { ready: 'revocable_quiet_batch'; vote: 'commit_once'; simultaneous: 'next_batch' };
+}
+export interface SessionConfig extends Rules {
+  schemaVersion: 1; experimental: true; rulesVersion: string; promptVersion: string; seed: string;
+  scheduling: { mode: 'fixed_5s' | 'fixed_15s' | 'event_driven'; eventReactionMs: number };
+  llm: { provider: 'openrouter'; model: string; displayName?: string; parameters: Record<string, unknown> };
+}
+export function parseConfig(value: unknown): SessionConfig {
+  const v = object(value);
+  keys(v, ['schemaVersion', 'experimental', 'rulesVersion', 'promptVersion', 'seed', 'players', 'rounds', 'negotiationTimeMs', 'scoring', 'policies', 'scheduling', 'llm']);
+  if (v.schemaVersion !== 1 || v.experimental !== true) throw new Error('Expected experimental schema v1');
+  const players = array(v.players).map(text);
+  if (players.length !== 5 || new Set(players).size !== 5 || players.some(id => !/^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(id) || ['__proto__', 'constructor', 'prototype'].includes(id))) throw new Error('Exactly five distinct safe seat IDs required');
+  const rounds = integer(v.rounds, 10); if (rounds > 12) throw new Error('Expected 10–12 rounds');
+  const s = object(v.scoring); keys(s, ['policy', 'solo', 'pair', 'majority']);
+  const scoring = { policy: oneOf(s.policy, ['exclusive', 'zero_sum']), solo: integer(s.solo), pair: integer(s.pair), majority: integer(s.majority, -Number.MAX_SAFE_INTEGER) };
+  if (scoring.policy === 'exclusive' && scoring.majority !== 0) throw new Error('Exclusive majority must be zero');
+  if (scoring.policy === 'zero_sum' && (scoring.solo + 4 * scoring.majority !== 0 || 2 * scoring.pair + 3 * scoring.majority !== 0)) throw new Error('Not zero sum');
+  const p = object(v.policies); keys(p, ['ready', 'vote', 'simultaneous']);
+  const t = object(v.scheduling); keys(t, ['mode', 'eventReactionMs']);
+  const l = object(v.llm); keys(l, ['provider', 'model', 'displayName', 'parameters']);
+  const parameters = object(l.parameters);
+  // Do not permit credentials or per-seat/provider overrides in common parameters.
+  const parameterKeys = ['temperature', 'top_p', 'max_tokens', 'reasoning', 'seed'];
+  keys(parameters, parameterKeys);
+  for (const field of ['temperature', 'top_p'] as const) {
+    const n = parameters[field];
+    if (n !== undefined && (typeof n !== 'number' || !Number.isFinite(n) || n < 0 || n > (field === 'temperature' ? 2 : 1))) throw new Error('Invalid sampling parameter');
+  }
+  if (parameters.max_tokens !== undefined) integer(parameters.max_tokens, 1);
+  if (parameters.seed !== undefined) integer(parameters.seed);
+  if (parameters.reasoning !== undefined) {
+    const reasoning = object(parameters.reasoning); keys(reasoning, ['effort', 'max_tokens']);
+    if (reasoning.effort !== undefined) oneOf(reasoning.effort, ['none', 'minimal', 'low', 'medium', 'high', 'xhigh']);
+    if (reasoning.max_tokens !== undefined) integer(reasoning.max_tokens, 1);
+  }
+  return {
+    schemaVersion: 1, experimental: true, players, rounds, negotiationTimeMs: integer(v.negotiationTimeMs, 1),
+    rulesVersion: text(v.rulesVersion), promptVersion: text(v.promptVersion), seed: text(v.seed), scoring,
+    policies: { ready: oneOf(p.ready, ['revocable_quiet_batch']), vote: oneOf(p.vote, ['commit_once']), simultaneous: oneOf(p.simultaneous, ['next_batch']) },
+    scheduling: { mode: oneOf(t.mode, ['fixed_5s', 'fixed_15s', 'event_driven']), eventReactionMs: integer(t.eventReactionMs, 1) },
+    llm: { provider: oneOf(l.provider, ['openrouter']), model: text(l.model), parameters: structuredClone(parameters), ...(l.displayName === undefined ? {} : { displayName: text(l.displayName) }) },
+  };
+}
