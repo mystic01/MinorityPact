@@ -1,0 +1,75 @@
+{
+  "version": 1,
+  "tool": "built-in image_gen",
+  "format": "png",
+  "transparent": true,
+  "expressionLabels": {
+    "neutral": "中性",
+    "speaking": "發言",
+    "smile": "微笑",
+    "doubtful": "疑惑",
+    "surprised": "驚訝"
+  },
+  "characters": {
+    "A": {
+      "seat": "A",
+      "expressions": {
+        "neutral": "/avatars/A/neutral.png",
+        "speaking": "/avatars/A/speaking.png",
+        "smile": "/avatars/A/smile.png",
+        "doubtful": "/avatars/A/doubtful.png",
+        "surprised": "/avatars/A/surprised.png"
+      },
+      "width": 1254,
+      "height": 1254
+    },
+    "B": {
+      "seat": "B",
+      "expressions": {
+        "neutral": "/avatars/B/neutral.png",
+        "speaking": "/avatars/B/speaking.png",
+        "smile": "/avatars/B/smile.png",
+        "doubtful": "/avatars/B/doubtful.png",
+        "surprised": "/avatars/B/surprised.png"
+      },
+      "width": 1254,
+      "height": 1254
+    },
+    "C": {
+      "seat": "C",
+      "expressions": {
+        "neutral": "/avatars/C/neutral.png",
+        "speaking": "/avatars/C/speaking.png",
+        "smile": "/avatars/C/smile.png",
+        "doubtful": "/avatars/C/doubtful.png",
+        "surprised": "/avatars/C/surprised.png"
+      },
+      "width": 1254,
+      "height": 1254
+    },
+    "D": {
+      "seat": "D",
+      "expressions": {
+        "neutral": "/avatars/D/neutral.png",
+        "speaking": "/avatars/D/speaking.png",
+        "smile": "/avatars/D/smile.png",
+        "doubtful": "/avatars/D/doubtful.png",
+        "surprised": "/avatars/D/surprised.png"
+      },
+      "width": 1254,
+      "height": 1254
+    },
+    "E": {
+      "seat": "E",
+      "expressions": {
+        "neutral": "/avatars/E/neutral.png",
+        "speaking": "/avatars/E/speaking.png",
+        "smile": "/avatars/E/smile.png",
+        "doubtful": "/avatars/E/doubtful.png",
+        "surprised": "/avatars/E/surprised.png"
+      },
+      "width": 1254,
+      "height": 1254
+    }
+  }
+}

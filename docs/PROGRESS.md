@@ -1,5 +1,7 @@
 # 實作進度 — 2026-11-08
 
+頭像素材完成：A–E各中性／發言／微笑／疑惑／驚訝，共25張1254×1254獨立透明PNG，web/public/avatars；附manifest、完整prompt集合、原始提案與docs/avatar-gallery.html預覽。內建image_gen製作，未接入遊戲UI、未加入人設。assets:check通過25圖透明／尺寸／不重複驗證，瀏覽器確認25圖全部載入並目視檢查；typecheck、web:check、build及97項離線測試通過。遊戲API未呼叫。對局截斷修復已另推送98830ba，須重啟服務後由使用者決定是否恢復。
+
 截斷修復驗證：97項離線測試、typecheck、web:check、build及scripted Chrome QA全部通過；測試確認token額度耗盡只嘗試一次、保留另外四席結果，GLM低推理預設不覆蓋使用者顯式設定。不呼叫付費API，服務須重啟後載入。
 
 最新截斷修復：新局ce3b730a在第1回合等待E（GLM5.3），三次finish_reason=length，4096 completion tokens全為reasoning，無完整JSON；其餘四席已成功。modelForSeat對GLM5.3/Flash在使用者未指定reasoning時加low，保留4096上限及顯式設定。ProviderDecisionError分類輸出截斷／不可重試HTTP錯誤，coordinator不再對相同額度做三次無效重試；公開畫面僅顯示安全的額度錯誤說明，不洩漏個別策略／原文。沒有付費API驗證、不自動恢復對局。重啟服務後可由使用者重試E，四個已成功結果保留。原始API輸出及歷史不改寫。頭像資產另在製作中，不影響此修復。

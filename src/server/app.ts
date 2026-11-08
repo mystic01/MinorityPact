@@ -138,7 +138,7 @@ export function createApp(options: AppOptions) {
       const path = resolve(root, `.${relative}`);
       if (!path.startsWith(`${root}/`) && !path.startsWith(`${root}\\`)) return json(res, 403, { error: 'Forbidden' });
       const content = readFileSync(path);
-      res.writeHead(200, { 'Content-Type': ({ '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css' } as Record<string, string>)[extname(path)] ?? 'application/octet-stream', 'Cache-Control': 'no-cache', 'Content-Security-Policy': "default-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; script-src 'self'; frame-ancestors 'none'" });
+      res.writeHead(200, { 'Content-Type': ({ '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.json': 'application/json' } as Record<string, string>)[extname(path)] ?? 'application/octet-stream', 'Cache-Control': 'no-cache', 'Content-Security-Policy': "default-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; script-src 'self'; frame-ancestors 'none'" });
       res.end(content);
     } catch { if (!res.headersSent) json(res, 400, { error: 'Request unavailable; check configuration, key or session state.' }); else res.end(); }
   });

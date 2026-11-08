@@ -15,7 +15,8 @@
     "serve": "node --env-file-if-exists=.env src/server/main.ts",
     "start": "npm run build && npm run serve",
     "experiment": "node src/experiments/cli.ts",
-    "test:browser": "node tests/browser-smoke.ts"
+    "test:browser": "node tests/browser-smoke.ts",
+    "assets:check": "node scripts/validate-avatars.ts"
   },
   "devDependencies": {
     "@types/node": "24.10.1",
