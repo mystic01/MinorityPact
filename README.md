@@ -67,3 +67,7 @@ FROM decision_audit ORDER BY id DESC LIMIT 50;
 真正 LLM smoke 與實驗進度見 docs/PROGRESS.md；模擬 HTTP 測試僅證明串接與流程，不證明模型策略能力。API 實作參考 [OpenRouter API](https://openrouter.ai/docs/api_reference/overview) 與 [Structured Outputs](https://openrouter.ai/docs/guides/features/structured-outputs)。
 
 實驗工具：`npm.cmd run experiment -- matrix configs/experimental.json` 產生12組可配置對照檔（不呼叫API）；`npm.cmd run experiment -- report DATABASE SESSION_ID` 輸出不含私訊內文的客觀指標。Chrome UI檢查：`npm.cmd run test:browser`；必要時設定BROWSER_PATH。詳見docs/T8_PROGRESS.md。
+
+## 手動檔案模式
+
+網頁新對局選「手動檔案（自動檢查回覆）」。每席 Markdown 可整份貼給 AI，答案貼回同檔指定區並儲存；網頁自動顯示進度，收齊後前進。詳見 [完整說明](docs/MANUAL_MODE.md)。

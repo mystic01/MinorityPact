@@ -31,13 +31,13 @@ export class DecisionCoordinator {
     if (result.kind === 'version_conflict') throw new Error('Concurrent session writer');
   }
   // pace must wait the requested GAME interval in live mode; tests supply a virtual pacer.
-  async step(pace: (milliseconds: number) => Promise<void>, timeoutMs = 60000): Promise<'running' | 'completed' | 'waiting_human'> {
+  async step(pace: (milliseconds: number) => Promise<void>, timeoutMs = 60000): Promise<'running' | 'completed' | 'waiting_human' | 'waiting_manual'> {
     if (this.busy) throw new Error('Coordinator already running');
     this.busy = true;
     try { return await this.execute(pace, timeoutMs); }
     finally { this.busy = false; }
   }
-  private async execute(pace: (milliseconds: number) => Promise<void>, timeoutMs: number): Promise<'running' | 'completed' | 'waiting_human'> {
+  private async execute(pace: (milliseconds: number) => Promise<void>, timeoutMs: number): Promise<'running' | 'completed' | 'waiting_human' | 'waiting_manual'> {
     const config = this.store.getConfig(this.sessionId);
     let history = await this.store.readEvents(this.sessionId, 0);
     let state = history.reduce((s, e) => reduce(s, e.data), createGame(this.sessionId, config));
@@ -103,6 +103,7 @@ export class DecisionCoordinator {
           pending.result = result;
           writes = writes.then(() => this.save(cp)); await writes; return;
         } catch (error) {
+          if (error && typeof error === 'object' && 'manualPending' in error) return;
           const reason = error instanceof Error && ['Unknown observed event', 'Goal change needs reason', 'Wake must be in future', 'Commit requires one vote', 'Invalid action time', 'Messages must use current logicalTimeMs; schedule nextWake to reconsider later', 'Action outside negotiation', 'Invalid recipient'].includes(error.message) ? error.message : 'Output format invalid or provider unavailable';
           pending.validationFeedback = `Previous output was rejected: ${reason}. Follow the exact action schema, current phase and legal scheduledTimeMs. Do not invent action types. Keep the same game snapshot; no new game information is available.`;
           this.store.recordAudit(this.sessionId, pending.snapshot.snapshotId, { kind: 'decision_rejected', attempt: attempt + 1, reason: error instanceof Error ? error.message : 'Unknown error', code: error && typeof error === 'object' && 'code' in error ? error.code : null });
@@ -114,6 +115,7 @@ export class DecisionCoordinator {
     }));
     await writes;
     if (settled.some(r => r.status === 'rejected')) throw new Error('paused_error: decision failed; resume same snapshots');
+    if (cp.pendingDecisions.some(p => !p.result && p.snapshot.input.agentId !== config.humanSeat)) { await this.save(cp); return 'waiting_manual'; }
     const human = cp.pendingDecisions.find(p => p.snapshot.input.agentId === config.humanSeat);
     if (human && !human.result) {
       const submitted = this.store.humanSubmission(this.sessionId, human.snapshot.snapshotId);

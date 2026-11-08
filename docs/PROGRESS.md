@@ -102,3 +102,12 @@ T1/T2 程式已實作；規則測試通過，**型別檢查尚未驗證成功，
 - 未來完整事件封裝與 ACL 在 T3 處理，內部 DomainEvent 絕不可直接推送瀏覽器；T4 負責快照、未來行動、批次延遲與重試。
 
 下一步：先成功執行 `npm.cmd install`、`npm.cmd run typecheck`，修正任何型別問題並保存 lockfile，再開始 T3 事件持久化與權限投影。只需讀本頁、contracts、domain、application/ports.ts 與 ARCHITECTURE.md 第 7–9 節。T3 重點驗收是私訊哨兵隔離、整批 transaction、重試冪等與按 cursor 重播。
+
+## 2026-11-09 手動檔案模式
+
+- 網頁新增手動檔案模式，後端每秒 polling；不需要終端 Enter。每席固定 Markdown 含完整規則、授權歷史、JSON Schema、請求編號與回覆區，整份可直接交給外部 AI。
+- 檔案內容連續兩次相同才匯入；畫面顯示等待、儲存穩定、驗證失敗、已接受及本批無需回覆。收齊同批有效回覆才結算，等待不消耗遊戲時間，支援部分結果持久化與重啟續接。
+- 文件：docs/MANUAL_MODE.md；外部模型身分未驗證，不沿用 API 模型標籤。交換檔及歷史保存在 data/manual，未提交。
+- 驗證：npm.cmd run typecheck、npm.cmd run web:check、npm.cmd run build 通過；npm.cmd test 118/118 通過。npm.cmd run test:browser 既有 Chrome scripted QA 通過。
+- 新增 tests/manual-file.test.ts：錯誤請求編號、部分回覆、時鐘凍結、資料庫重開與完整五回合 scripted game 通過。tests/manual-browser.ts：無 API key 開局、五席狀態、破損 JSON 修正、部分接受不公開、收齊自動進入投票、暫停及伺服器重啟續接通過；截圖位於忽略目錄 .npm-cache/browser-qa/manual-progress.png。
+- 開發中曾修正 Node strip-only 不支援參數屬性及 PowerShell 管線中文編碼問題；最終型別、瀏覽器與單元驗證通過。全部為離線 scripted/mock 驗證，未呼叫付費 API，未續接既有真正多模型 smoke，不能視為真實十回合或策略品質驗收。

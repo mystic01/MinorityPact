@@ -11,10 +11,11 @@ import { SqliteEventStore } from '../infrastructure/sqlite-store.ts';
 import { ReplayService } from '../application/replay.ts';
 import { DecisionCoordinator } from '../application/coordinator.ts';
 import { humanDecision } from '../application/human.ts';
+import { ManualFileController } from '../controllers/manual-file.ts';
 import { OpenRouterController } from '../controllers/openrouter.ts';
 
-type Status = 'waiting_human' | 'idle' | 'running' | 'advancing' | 'paused' | 'paused_error' | 'completed' | 'aborted';
-export interface AppOptions { store: SqliteEventStore; config: SessionConfig; apiKey?: string; assets?: string; controllers?: (config: SessionConfig, id: string) => Record<string, AgentController>; pace?: (ms: number) => Promise<void> }
+type Status = 'waiting_manual' | 'waiting_human' | 'idle' | 'running' | 'advancing' | 'paused' | 'paused_error' | 'completed' | 'aborted';
+export interface AppOptions { manualRoot?: string; store: SqliteEventStore; config: SessionConfig; apiKey?: string; assets?: string; controllers?: (config: SessionConfig, id: string) => Record<string, AgentController>; pace?: (ms: number) => Promise<void> }
 export function createApp(options: AppOptions) {
   const { store } = options; const replay = new ReplayService(store);
   const token = randomBytes(32).toString('hex');
@@ -23,8 +24,11 @@ export function createApp(options: AppOptions) {
   }();
   for (const id of store.listSessions()) {
     const status = store.getStatus(id) as Status;
-    states.set(id, ['running', 'advancing', 'paused'].includes(status) ? 'paused_error' : status);
+    states.set(id, ['running', 'advancing', 'paused', 'waiting_manual'].includes(status) ? 'paused_error' : status);
   }
+  const manualStates = new Map<string, Record<string, string>>();
+  const manualDirectory = (id: string) => resolve(options.manualRoot ?? 'data/manual', id);
+  let stopped = false;
   let active: string | null = null;
   const clocks = new Map<string, number>();
   const statusFor = (id: string, phase: string) => states.get(id) === 'aborted' ? 'aborted' : phase === 'completed' ? 'completed' : states.get(id) ?? 'idle';
@@ -42,23 +46,25 @@ export function createApp(options: AppOptions) {
   const run = (id: string) => {
     if (active || states.get(id) === 'aborted') throw new Error('Unavailable');
     const config = store.getConfig(id);
-    if (!options.controllers && !options.apiKey) throw new Error('Missing key');
-    const controllers = options.controllers?.(config, id) ?? Object.fromEntries(config.players.filter(agent => agent !== config.humanSeat).map(agent => [agent, new OpenRouterController(modelForSeat(config, agent, typeof options.config.llm.parameters.max_tokens === 'number' ? options.config.llm.parameters.max_tokens : undefined), options.apiKey!, (snapshot, record) => store.recordAudit(id, snapshot, record))]));
+    const manual = config.decisionMode === 'manual_file';
+    if (!manual && !options.controllers && !options.apiKey) throw new Error('Missing key');
+    if (manual) manualStates.set(id, {});
+    const controllers = manual ? Object.fromEntries(config.players.map(agent => [agent, new ManualFileController(manualDirectory(id), (seat, status) => { manualStates.get(id)![seat] = status; }, true)])) : options.controllers?.(config, id) ?? Object.fromEntries(config.players.filter(agent => agent !== config.humanSeat).map(agent => [agent, new OpenRouterController(modelForSeat(config, agent, typeof options.config.llm.parameters.max_tokens === 'number' ? options.config.llm.parameters.max_tokens : undefined), options.apiKey!, (snapshot, record) => store.recordAudit(id, snapshot, record))]));
     active = id; states.set(id, 'running');
     const c = new DecisionCoordinator(store, id, controllers);
     void (async () => {
       try {
-        while (states.get(id) !== 'aborted') {
-          while (states.get(id) === 'paused') await delay(50);
-          if (states.get(id) === 'aborted') break;
+        while (!stopped && states.get(id) !== 'aborted') {
+          while (!stopped && states.get(id) === 'paused') await delay(50);
+          if (stopped || states.get(id) === 'aborted') break;
           const result = await c.step(async ms => {
-            if (ms && !config.humanSeat) {
+            if (ms && !config.humanSeat && !manual) {
               if (states.get(id) !== 'paused') states.set(id, 'advancing');
               const base = (await store.loadCheckpoint(id))?.logicalTimeMs ?? 0;
               clocks.set(id, base);
               if (options.pace) await options.pace(ms);
               else for (let elapsed = 0; elapsed < ms; elapsed += Math.min(100, ms - elapsed)) {
-                while (states.get(id) === 'paused') await delay(50);
+                while (!stopped && states.get(id) === 'paused') await delay(50);
                 if (states.get(id) === 'aborted') throw new Error('Aborted');
                 await delay(Math.min(100, ms - elapsed));
                 clocks.set(id, base + elapsed + Math.min(100, ms - elapsed));
@@ -67,7 +73,8 @@ export function createApp(options: AppOptions) {
             if (states.get(id) === 'aborted') throw new Error('Aborted');
             if (states.get(id) !== 'paused') states.set(id, 'running');
           }, 120000);
-          if (states.get(id) === 'aborted') break;
+          if (stopped || states.get(id) === 'aborted') break;
+          if (result === 'waiting_manual') { if (states.get(id) !== 'paused') states.set(id, 'waiting_manual'); await delay(1000); continue; }
           if (result === 'waiting_human') { if (states.get(id) !== 'paused') states.set(id, 'waiting_human'); break; }
           if (result === 'completed') { states.set(id, 'completed'); break; }
         }
@@ -93,7 +100,8 @@ export function createApp(options: AppOptions) {
           if (auth.length !== token.length || !timingSafeEqual(Buffer.from(auth), Buffer.from(token))) return json(res, 403, { error: 'Forbidden' });
           if (url.pathname === '/api/sessions') {
             let raw = ''; for await (const chunk of req) { raw += String(chunk); if (raw.length > 32000) throw new Error('Too large'); }
-            const config = raw ? parseConfig(JSON.parse(raw)) : options.config;
+            const config = raw ? parseConfig(JSON.parse(raw)) : structuredClone(options.config);
+            if (config.decisionMode === 'manual_file') { delete config.seatModels; config.llm = { provider: 'openrouter', model: 'manual-file', displayName: '手動檔案（外部模型未驗證）', parameters: {} }; }
             const id = randomUUID(); store.createSession(id, config); states.set(id, 'idle'); return json(res, 201, { id });
           }
           const id = parts[2]!; const action = parts[3];
@@ -120,6 +128,17 @@ export function createApp(options: AppOptions) {
         if (url.pathname === '/api/sessions') return json(res, 200, { sessions: store.listSessions() });
         const id = parts[2]!; const action = parts[3];
         if (parts[1] !== 'sessions') throw new Error('Unknown route');
+        if (action === 'manual') {
+          const auth = String(req.headers['x-operation-token'] ?? '');
+          if (auth.length !== token.length || !timingSafeEqual(Buffer.from(auth), Buffer.from(token))) return json(res, 403, { error: 'Forbidden' });
+          const config = store.getConfig(id);
+          if (config.decisionMode !== 'manual_file') return json(res, 200, { enabled: false });
+          const cp = await store.loadCheckpoint(id);
+          return json(res, 200, { enabled: true, directory: manualDirectory(id), players: config.players.map(seat => {
+            const p = cp?.pendingDecisions.find(p => p.snapshot.input.agentId === seat);
+            return { seat, file: `player-${seat}.md`, status: p?.result ? '已接受' : p ? manualStates.get(id)?.[seat] ?? '等待回覆' : '本批無需回覆', round: p?.snapshot.input.round, phase: p?.snapshot.input.phase };
+          }) });
+        }
         if (action === 'player') {
           const auth = String(req.headers['x-operation-token'] ?? '');
           if (auth.length !== token.length || !timingSafeEqual(Buffer.from(auth), Buffer.from(token))) return json(res, 403, { error: 'Forbidden' });
@@ -174,5 +193,5 @@ export function createApp(options: AppOptions) {
       res.end(content);
     } catch { if (!res.headersSent) json(res, 400, { error: 'Request unavailable; check configuration, key or session state.' }); else res.end(); }
   });
-  return { server, stop: () => { if (active) states.set(active, 'aborted'); server.closeAllConnections(); server.close(); } };
+  return { server, stop: () => { stopped = true; if (active) states.set(active, store.getConfig(active).decisionMode === 'manual_file' ? 'paused' : 'aborted'); server.closeAllConnections(); server.close(); } };
 }

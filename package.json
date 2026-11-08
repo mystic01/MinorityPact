@@ -16,7 +16,8 @@
     "start": "npm run build && npm run serve",
     "experiment": "node src/experiments/cli.ts",
     "test:browser": "node tests/browser-smoke.ts",
-    "assets:check": "node scripts/validate-avatars.ts"
+    "assets:check": "node scripts/validate-avatars.ts",
+    "test:manual-browser": "node tests/manual-browser.ts"
   },
   "devDependencies": {
     "@types/node": "24.10.1",

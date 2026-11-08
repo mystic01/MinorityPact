@@ -176,3 +176,7 @@ status：created → running ↔ paused / paused_error → completed 或 aborted
 8. 真正五 LLM 完整 10 或 12 回合另存驗收紀錄；未跑之前只能稱工程測試通過。
 
 實驗分階段：先一場真實 smoke，再固定其他變因比較 B/C，接著比較 5s/15s/event-driven 與 10/12。保留多 seed、不挑精彩樣本。seed 只能重現引擎排序；LLM 重新呼叫不保證重現，精確重播依賴已存輸出。
+
+## 手動檔案模式（2026-11-09）
+
+SessionConfig.decisionMode=manual_file 由網頁選擇並保存。ManualFileController 沿用 SYSTEM_PROMPT、授權快照、decisionSchemaFor 與 parseDecision。Coordinator 回傳 waiting_manual，保留部分結果，同批未齊不結算。後端每秒檢查，內容連續兩次相同才讀取；前端輪詢受 token 保護的 manual 進度端點，不傳私有內容。交換檔在 data/manual/對局ID，archive 保存歷史。此模式不建立 OpenRouterController；舊 provider 欄位僅保留相容性。

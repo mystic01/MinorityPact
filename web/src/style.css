@@ -549,3 +549,9 @@ label input {
     scroll-behavior:auto!important
   }
 }
+
+.manual-panel { margin: 12px 0; padding: 16px; }
+.manual-panel p { margin: 8px 0; overflow-wrap: anywhere; }
+.manual-players { display: flex; flex-wrap: wrap; gap: 16px; }
+.manual-players > div { display: grid; gap: 5px; flex: 1 1 150px; }
+body:has(.manual-panel) { overflow: auto; }

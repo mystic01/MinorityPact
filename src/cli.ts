@@ -25,6 +25,7 @@ async function main(): Promise<void> {
     const id = givenId ?? randomUUID();
     if (command === 'start') store.createSession(id, config);
     const actual = store.getConfig(id); // Rules and models remain frozen; the supplied config may raise output allowance.
+    if (actual.decisionMode === 'manual_file') throw new Error('Manual sessions require browser server');
     if (actual.humanSeat) throw new Error('Human sessions require the browser server');
     const activeStore = store;
     const controllers = Object.fromEntries(actual.players.map(agent => [agent, new OpenRouterController(modelForSeat(actual, agent, typeof config.llm.parameters.max_tokens === 'number' ? config.llm.parameters.max_tokens : undefined), key, (snapshot, audit) => activeStore.recordAudit(id, snapshot, audit))]));
