@@ -18,7 +18,7 @@ const statusLabel = computed(() => replayMode.value ? '重播檢視' : ({ runnin
 const time = (ms: number) => `${Math.floor(ms / 60000).toString().padStart(2, '0')}:${Math.floor(ms / 1000 % 60).toString().padStart(2, '0')}`;
 const remaining = computed(() => Math.max(0, (state.value?.negotiationTimeMs ?? 0) - ((view.value?.clockTimeMs ?? state.value?.logicalTimeMs ?? 0) - (state.value?.roundStartedMs ?? 0))));
 const votes = computed(() => ['reveal', 'completed'].includes(state.value?.phase ?? '') ? [...events.value].reverse().find(e => e.type === 'votes_revealed')?.publicPayload.votes as Record<string, string> | undefined : undefined);
-const models = ['google/gemini-2.5-flash', 'google/gemini-2.5-pro', 'google/gemini-2.5-flash-lite', 'google/gemini-3.5-flash', 'google/gemini-3.5-flash-lite'];
+const models = ['z-ai/glm-5.3-flash', 'qwen/qwen3.8-flash', 'deepseek/deepseek-v3.2', 'google/gemini-2.5-flash-lite', 'z-ai/glm-5.3', 'google/gemini-2.5-flash', 'google/gemini-2.5-pro', 'google/gemini-3.5-flash', 'google/gemini-3.5-flash-lite'];
 async function api(path: string, body?: unknown) {
   const r = await fetch(path, body === undefined ? {} : { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Operation-Token': token.value }, body: JSON.stringify(body) });
   if (!r.ok) throw new Error('操作未完成：請確認 API key、設定或對局狀態。'); return r.json();

@@ -10,12 +10,12 @@
   "scoring": { "policy": "exclusive", "solo": 5, "pair": 2, "majority": 0 },
   "policies": { "ready": "revocable_quiet_batch", "vote": "commit_once", "simultaneous": "next_batch" },
   "scheduling": { "mode": "fixed_5s", "eventReactionMs": 1000 },
-  "llm": { "provider": "openrouter", "model": "google/gemini-2.5-flash", "displayName": "Gemini 2.5 Flash", "parameters": {} },
+  "llm": { "provider": "openrouter", "model": "z-ai/glm-5.3-flash", "displayName": "GLM 5.3 Flash", "parameters": { "max_tokens": 4096 } },
   "seatModels": {
-    "A": { "model": "google/gemini-2.5-flash", "displayName": "Gemini 2.5 Flash" },
-    "B": { "model": "google/gemini-2.5-pro", "displayName": "Gemini 2.5 Pro" },
-    "C": { "model": "google/gemini-2.5-flash-lite", "displayName": "Gemini 2.5 Flash Lite" },
-    "D": { "model": "google/gemini-3.5-flash", "displayName": "Gemini 3.5 Flash" },
-    "E": { "model": "google/gemini-3.5-flash-lite", "displayName": "Gemini 3.5 Flash Lite" }
+    "A": { "model": "z-ai/glm-5.3-flash", "displayName": "GLM 5.3 Flash" },
+    "B": { "model": "qwen/qwen3.8-flash", "displayName": "Qwen3.8 Flash" },
+    "C": { "model": "deepseek/deepseek-v3.2", "displayName": "DeepSeek V3.2" },
+    "D": { "model": "google/gemini-2.5-flash-lite", "displayName": "Gemini 2.5 Flash Lite" },
+    "E": { "model": "z-ai/glm-5.3", "displayName": "GLM 5.3" }
   }
 }

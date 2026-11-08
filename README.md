@@ -2,7 +2,7 @@
 
 本機多模型博弈控制台，含公開即時觀戰與終局全知重播。需要 Node.js 24 以上。
 
-啟動：`npm.cmd start`，開啟 http://127.0.0.1:3000。預設五席使用不同 Gemini；設定存於 configs/experimental.json 的 seatModels，可在建立新局前於畫面調整。真實執行需要本機 .env 的 OPENROUTER_API_KEY。每局設定凍結，歷史重播顯示當局模型。server 預設採 experimental.json；可設定 GAME_CONFIG 指向其他檔案。
+啟動：`npm.cmd start`，開啟 http://127.0.0.1:3000。預設五席為 GLM 5.3 Flash、Qwen3.8 Flash、DeepSeek V3.2、Gemini 2.5 Flash Lite、GLM 5.3；設定存於 configs/experimental.json 的 seatModels，可在建立新局前於畫面調整。共同 max_tokens 暫設4096，避免使用供應商過大的預設輸出預留額度；這是含推理在內的輸出預算，非訊息數限制，若發生截斷須再調校。真實執行需要本機 .env 的 OPENROUTER_API_KEY。每局設定凍結，歷史重播顯示當局模型。server 預設採 experimental.json；可設定 GAME_CONFIG 指向其他檔案。
 
 ```powershell
 npm.cmd install
@@ -12,7 +12,7 @@ npm.cmd test
 
 Node 原生執行 TypeScript 測試，不需測試框架或 API key。TypeScript 靜態檢查仍需安裝 devDependencies。
 
-`configs/experimental.json` 已提供五個不同 Gemini 模型 ID。`llm` 保存共用參數及未指定 seatModels 時的預設；seatModels 可逐席覆寫模型。API key 從 OPENROUTER_API_KEY 讀取（見 .env.example），不傳入瀏覽器。
+`configs/experimental.json` 已提供五個不同低成本模型 ID。`llm` 保存共用參數及未指定 seatModels 時的預設；seatModels 可逐席覆寫模型。API key 從 OPENROUTER_API_KEY 讀取（見 .env.example），不傳入瀏覽器。
 
 `parseConfig(unknown)` 與 `parseDecision(unknown)` 是 runtime 驗證入口。規則引擎接收已驗證設定；`resolveBatch` 只接當下到期行動，未來 action、批次 ID 冪等與快照由 T3/T4 負責。回傳事件以 `reduce` 套用到新狀態；輸入不被修改。reveal 後以空批次推進下一回合或終局，便於後續觀戰呈現揭曉階段。
 

@@ -1,5 +1,9 @@
 # 實作進度 — 2026-11-08
 
+本次預設模型修改驗證：typecheck、web:check、build、94項離線測試與Chrome scripted QA全部通過，沒有付費API呼叫。
+
+最新五席預設：依使用者確認改成A GLM5.3Flash、B Qwen3.8Flash、C DeepSeekV3.2、D Gemini2.5FlashLite、E GLM5.3，新增至網頁模型選單並保留原Gemini選項。新局共同max_tokens暫設4096，避免先前65536預留問題；舊局設定與歷史不改動。服務重新啟動後建立新局生效，若另設GAME_CONFIG需同步調整該檔。不呼叫付費API驗證。
+
 本次暫停修復驗證：typecheck、web:check通過，完整離線測試94項通過。服務尚未重啟、未自動恢復對局；重新啟動npm.cmd start後，使用者可按繼續對局，只重試未成功決策。
 
 暫停修復：本機games.sqlite最新paused_error局的API皆回200，連續被Goal change needs reason拒絕。原因是輸出schema容許revisionReason=null，但coordinator在goal文字改寫時要求原因。新增依該席最後goal產生的分支schema：沿用原goal或填非空白原因；提示亦要求未變目標逐字沿用。保留後端嚴格驗證、原始稽核與pending快照，不補寫模型原因、不自動恢復付費對局。以mock回歸測試驗證請求包含條件及原文且不修改快照。服務需重新啟動載入修正，再由使用者按繼續對局。
