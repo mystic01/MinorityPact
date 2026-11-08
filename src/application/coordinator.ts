@@ -31,13 +31,13 @@ export class DecisionCoordinator {
     if (result.kind === 'version_conflict') throw new Error('Concurrent session writer');
   }
   // pace must wait the requested GAME interval in live mode; tests supply a virtual pacer.
-  async step(pace: (milliseconds: number) => Promise<void>, timeoutMs = 60000): Promise<'running' | 'completed'> {
+  async step(pace: (milliseconds: number) => Promise<void>, timeoutMs = 60000): Promise<'running' | 'completed' | 'waiting_human'> {
     if (this.busy) throw new Error('Coordinator already running');
     this.busy = true;
     try { return await this.execute(pace, timeoutMs); }
     finally { this.busy = false; }
   }
-  private async execute(pace: (milliseconds: number) => Promise<void>, timeoutMs: number): Promise<'running' | 'completed'> {
+  private async execute(pace: (milliseconds: number) => Promise<void>, timeoutMs: number): Promise<'running' | 'completed' | 'waiting_human'> {
     const config = this.store.getConfig(this.sessionId);
     let history = await this.store.readEvents(this.sessionId, 0);
     let state = history.reduce((s, e) => reduce(s, e.data), createGame(this.sessionId, config));
@@ -68,7 +68,7 @@ export class DecisionCoordinator {
         const key = (id: string) => createHash('sha256').update(JSON.stringify([config.seed, batchId, id])).digest('hex');
         return key(a).localeCompare(key(b));
       });
-      const actors = order.filter(id => !cp.initialized || state.phase === 'commit' && !state.votes[id] || (cp.subscriptions[id]?.atGameTimeMs ?? Infinity) <= time || (cp.wakeQueue?.[id] ?? Infinity) <= time || (cp.reconsiderDue?.[id] ?? Infinity) <= time);
+      const actors = order.filter(id => id === config.humanSeat && state.phase === 'negotiation' || !cp.initialized || state.phase === 'commit' && !state.votes[id] || (cp.subscriptions[id]?.atGameTimeMs ?? Infinity) <= time || (cp.wakeQueue?.[id] ?? Infinity) <= time || (cp.reconsiderDue?.[id] ?? Infinity) <= time);
       cp.pendingDecisions = actors.map(agentId => {
         const wakeReasons = [
           ...(!cp.initialized ? ['phase_started'] : []),
@@ -93,7 +93,7 @@ export class DecisionCoordinator {
     // All requests use persisted snapshots; completion order never changes application order.
     let writes = Promise.resolve();
     const settled = await Promise.allSettled(cp.pendingDecisions.map(async pending => {
-      if (pending.result) return;
+      if (pending.result || pending.snapshot.input.agentId === config.humanSeat) return;
       let last: unknown;
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
@@ -114,6 +114,13 @@ export class DecisionCoordinator {
     }));
     await writes;
     if (settled.some(r => r.status === 'rejected')) throw new Error('paused_error: decision failed; resume same snapshots');
+    const human = cp.pendingDecisions.find(p => p.snapshot.input.agentId === config.humanSeat);
+    if (human && !human.result) {
+      const submitted = this.store.humanSubmission(this.sessionId, human.snapshot.snapshotId);
+      if (!submitted) return 'waiting_human';
+      const result = parseDecision(submitted); this.validate(result, human.snapshot.input, state, config);
+      human.result = result; await this.save(cp);
+    }
     const events: DomainEvent[] = [];
     for (const p of cp.pendingDecisions) {
       const result = p.result!; const actorId = p.snapshot.input.agentId;

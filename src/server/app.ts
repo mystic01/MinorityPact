@@ -10,9 +10,10 @@ import type { AgentController } from '../contracts/decision.ts';
 import { SqliteEventStore } from '../infrastructure/sqlite-store.ts';
 import { ReplayService } from '../application/replay.ts';
 import { DecisionCoordinator } from '../application/coordinator.ts';
+import { humanDecision } from '../application/human.ts';
 import { OpenRouterController } from '../controllers/openrouter.ts';
 
-type Status = 'idle' | 'running' | 'advancing' | 'paused' | 'paused_error' | 'completed' | 'aborted';
+type Status = 'waiting_human' | 'idle' | 'running' | 'advancing' | 'paused' | 'paused_error' | 'completed' | 'aborted';
 export interface AppOptions { store: SqliteEventStore; config: SessionConfig; apiKey?: string; assets?: string; controllers?: (config: SessionConfig, id: string) => Record<string, AgentController>; pace?: (ms: number) => Promise<void> }
 export function createApp(options: AppOptions) {
   const { store } = options; const replay = new ReplayService(store);
@@ -42,7 +43,7 @@ export function createApp(options: AppOptions) {
     if (active || states.get(id) === 'aborted') throw new Error('Unavailable');
     const config = store.getConfig(id);
     if (!options.controllers && !options.apiKey) throw new Error('Missing key');
-    const controllers = options.controllers?.(config, id) ?? Object.fromEntries(config.players.map(agent => [agent, new OpenRouterController(modelForSeat(config, agent, typeof options.config.llm.parameters.max_tokens === 'number' ? options.config.llm.parameters.max_tokens : undefined), options.apiKey!, (snapshot, record) => store.recordAudit(id, snapshot, record))]));
+    const controllers = options.controllers?.(config, id) ?? Object.fromEntries(config.players.filter(agent => agent !== config.humanSeat).map(agent => [agent, new OpenRouterController(modelForSeat(config, agent, typeof options.config.llm.parameters.max_tokens === 'number' ? options.config.llm.parameters.max_tokens : undefined), options.apiKey!, (snapshot, record) => store.recordAudit(id, snapshot, record))]));
     active = id; states.set(id, 'running');
     const c = new DecisionCoordinator(store, id, controllers);
     void (async () => {
@@ -51,7 +52,7 @@ export function createApp(options: AppOptions) {
           while (states.get(id) === 'paused') await delay(50);
           if (states.get(id) === 'aborted') break;
           const result = await c.step(async ms => {
-            if (ms) {
+            if (ms && !config.humanSeat) {
               if (states.get(id) !== 'paused') states.set(id, 'advancing');
               const base = (await store.loadCheckpoint(id))?.logicalTimeMs ?? 0;
               clocks.set(id, base);
@@ -66,6 +67,8 @@ export function createApp(options: AppOptions) {
             if (states.get(id) === 'aborted') throw new Error('Aborted');
             if (states.get(id) !== 'paused') states.set(id, 'running');
           }, 120000);
+          if (states.get(id) === 'aborted') break;
+          if (result === 'waiting_human') { if (states.get(id) !== 'paused') states.set(id, 'waiting_human'); break; }
           if (result === 'completed') { states.set(id, 'completed'); break; }
         }
       } catch { if (states.get(id) !== 'aborted') states.set(id, 'paused_error'); }
@@ -94,11 +97,21 @@ export function createApp(options: AppOptions) {
             const id = randomUUID(); store.createSession(id, config); states.set(id, 'idle'); return json(res, 201, { id });
           }
           const id = parts[2]!; const action = parts[3];
-          store.getConfig(id);
+          const sessionConfig = store.getConfig(id);
+          if (action === 'human-submit') {
+            if (!sessionConfig.humanSeat || ['aborted', 'completed', 'idle'].includes(states.get(id) ?? 'idle')) throw new Error('Unavailable');
+            let raw = ''; for await (const chunk of req) { raw += String(chunk); if (raw.length > 32000) throw new Error('Too large'); }
+            const cp = await store.loadCheckpoint(id);
+            const pending = cp?.pendingDecisions.find(p => p.snapshot.input.agentId === sessionConfig.humanSeat);
+            if (!pending) throw new Error('No pending input');
+            store.submitHuman(id, pending.snapshot.snapshotId, humanDecision(JSON.parse(raw), pending.snapshot.input, sessionConfig.players));
+            if (!active && states.get(id) === 'waiting_human') run(id);
+            return json(res, 200, { submitted: true });
+          }
           if (action === 'start' || action === 'resume') {
             if (active === id && states.get(id) === 'paused') states.set(id, 'running');
             else run(id);
-          } else if (action === 'pause' && active === id) states.set(id, 'paused');
+          } else if (action === 'pause' && (active === id || states.get(id) === 'waiting_human')) states.set(id, 'paused');
           else if (action === 'abort') states.set(id, 'aborted');
           else throw new Error('Invalid command');
           return json(res, 200, { status: states.get(id) });
@@ -107,6 +120,22 @@ export function createApp(options: AppOptions) {
         if (url.pathname === '/api/sessions') return json(res, 200, { sessions: store.listSessions() });
         const id = parts[2]!; const action = parts[3];
         if (parts[1] !== 'sessions') throw new Error('Unknown route');
+        if (action === 'player') {
+          const auth = String(req.headers['x-operation-token'] ?? '');
+          if (auth.length !== token.length || !timingSafeEqual(Buffer.from(auth), Buffer.from(token))) return json(res, 403, { error: 'Forbidden' });
+          const config = store.getConfig(id);
+          if (!config.humanSeat) return json(res, 200, { seat: null });
+          const cp = await store.loadCheckpoint(id);
+          const pending = cp?.pendingDecisions.find(p => p.snapshot.input.agentId === config.humanSeat);
+          const view = await replay.read(id, { kind: 'agent', agentId: config.humanSeat });
+          const roundEvents = view.events.slice(view.events.findLastIndex(e => e.type === 'round_started') + 1);
+          const ready = roundEvents.findLast(e => e.type === 'ready_changed')?.publicPayload.ready === true;
+          const rules = pending ? JSON.parse(pending.snapshot.input.publicRules) : null;
+          return json(res, 200, { seat: config.humanSeat, events: view.events, ready,
+            pending: pending ? { snapshotId: pending.snapshot.snapshotId, phase: pending.snapshot.input.phase, round: pending.snapshot.input.round, logicalTimeMs: pending.snapshot.input.logicalTimeMs,
+              windowIndex: rules ? Math.floor((pending.snapshot.input.logicalTimeMs - rules.roundStartedMs) / 5000) + 1 : 1, windowCount: Math.ceil(config.negotiationTimeMs / 5000),
+              submitted: Boolean(pending.result || store.humanSubmission(id, pending.snapshot.snapshotId)) } : null });
+        }
         if (action === 'stream') {
           // Live stream always stays public, including after completion.
           let cursor = Number(req.headers['last-event-id'] ?? url.searchParams.get('after') ?? 0);

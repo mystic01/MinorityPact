@@ -4,6 +4,8 @@ import { parseConfig } from '../domain/config.ts';
 import type { SessionConfig } from '../domain/config.ts';
 import type { CommitRequest, CommitResult, EventStore, SchedulerCheckpoint, StoredEvent } from '../application/ports.ts';
 
+import type { DecisionResult } from '../contracts/decision.ts';
+
 // Trusted server-side adapter. Never expose this object to controllers or HTTP clients.
 export class SqliteEventStore implements EventStore {
   private db: DatabaseSync;
@@ -13,6 +15,7 @@ export class SqliteEventStore implements EventStore {
       PRAGMA journal_mode=WAL;
       CREATE TABLE IF NOT EXISTS migrations(version INTEGER PRIMARY KEY);
       CREATE TABLE IF NOT EXISTS session_runtime(session_id TEXT PRIMARY KEY REFERENCES sessions(id), status TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS human_submissions(session_id TEXT NOT NULL REFERENCES sessions(id), snapshot_id TEXT NOT NULL, result TEXT NOT NULL, PRIMARY KEY(session_id,snapshot_id));
       CREATE TABLE IF NOT EXISTS decision_records(session_id TEXT NOT NULL REFERENCES sessions(id), decision_id TEXT NOT NULL, record TEXT NOT NULL, PRIMARY KEY(session_id,decision_id));
       CREATE TRIGGER IF NOT EXISTS records_no_update BEFORE UPDATE ON decision_records BEGIN SELECT RAISE(ABORT,'append-only decisions'); END;
       CREATE TRIGGER IF NOT EXISTS records_no_delete BEFORE DELETE ON decision_records BEGIN SELECT RAISE(ABORT,'append-only decisions'); END;
@@ -27,6 +30,18 @@ export class SqliteEventStore implements EventStore {
       INSERT OR IGNORE INTO migrations VALUES(1);
       INSERT OR IGNORE INTO migrations VALUES(2);
       INSERT OR IGNORE INTO migrations VALUES(3);`);
+  }
+  humanSubmission(sessionId: string, snapshotId: string): DecisionResult | undefined {
+    const row = this.db.prepare('SELECT result FROM human_submissions WHERE session_id=? AND snapshot_id=?').get(sessionId, snapshotId);
+    return row ? JSON.parse(String(row.result)) : undefined;
+  }
+  submitHuman(sessionId: string, snapshotId: string, result: DecisionResult): void {
+    const existing = this.humanSubmission(sessionId, snapshotId);
+    if (existing) {
+      if (JSON.stringify(existing) !== JSON.stringify(result)) throw new Error('Already submitted');
+      return;
+    }
+    this.db.prepare('INSERT INTO human_submissions VALUES(?,?,?)').run(sessionId, snapshotId, JSON.stringify(result));
   }
   close(): void { this.db.close(); }
   setStatus(id: string, status: string): void { this.db.prepare('INSERT INTO session_runtime VALUES(?,?) ON CONFLICT(session_id) DO UPDATE SET status=excluded.status').run(id, status); }

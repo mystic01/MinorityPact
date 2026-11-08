@@ -5,6 +5,7 @@ export interface Rules {
   policies: { ready: 'revocable_quiet_batch'; vote: 'commit_once'; simultaneous: 'next_batch'; messageTiming?: 'immediate' | 'scheduled' };
 }
 export interface SessionConfig extends Rules {
+  humanSeat?: string;
   schemaVersion: 1; experimental: true; rulesVersion: string; promptVersion: string; seed: string;
   scheduling: { mode: 'fixed_5s' | 'fixed_15s' | 'event_driven'; eventReactionMs: number; privateMessageWake?: 'always' | 'subscribed'; reconsiderAfterMs?: number };
   llm: { provider: 'openrouter'; model: string; displayName?: string; parameters: Record<string, unknown> };
@@ -12,7 +13,7 @@ export interface SessionConfig extends Rules {
 }
 export function parseConfig(value: unknown): SessionConfig {
   const v = object(value);
-  keys(v, ['schemaVersion', 'experimental', 'rulesVersion', 'promptVersion', 'seed', 'players', 'rounds', 'negotiationTimeMs', 'scoring', 'policies', 'scheduling', 'llm', 'seatModels']);
+  keys(v, ['schemaVersion', 'experimental', 'rulesVersion', 'promptVersion', 'seed', 'players', 'rounds', 'negotiationTimeMs', 'scoring', 'policies', 'scheduling', 'llm', 'seatModels', 'humanSeat']);
   if (v.schemaVersion !== 1 || v.experimental !== true) throw new Error('Expected experimental schema v1');
   const players = array(v.players).map(text);
   if (players.length !== 5 || new Set(players).size !== 5 || players.some(id => !/^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(id) || ['__proto__', 'constructor', 'prototype'].includes(id))) throw new Error('Exactly five distinct safe seat IDs required');
@@ -47,7 +48,9 @@ export function parseConfig(value: unknown): SessionConfig {
       return [id, { model: text(seat.model), ...(seat.displayName === undefined ? {} : { displayName: text(seat.displayName) }) }];
     }));
   }
+  if (v.humanSeat !== undefined && (!players.includes(text(v.humanSeat)) || t.mode !== 'fixed_5s' || p.messageTiming !== 'immediate')) throw new Error('Human mode requires a valid seat, fixed_5s and immediate messages');
   return {
+    ...(v.humanSeat === undefined ? {} : { humanSeat: text(v.humanSeat) }),
     ...(seatModels === undefined ? {} : { seatModels }),
     schemaVersion: 1, experimental: true, players, rounds, negotiationTimeMs: integer(v.negotiationTimeMs, 1),
     rulesVersion: text(v.rulesVersion), promptVersion: text(v.promptVersion), seed: text(v.seed), scoring,
