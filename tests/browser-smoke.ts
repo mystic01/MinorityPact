@@ -154,7 +154,7 @@ try {
   await page.getByRole('button', { name: '提交並推進', exact: true }).click();
   // D reacts to our private message in this batch, so the quiet-batch rule
   // requires one further submission before negotiation can finish.
-  await page.getByText('交涉窗口 3／10', { exact: true }).waitFor();
+  await page.getByText('交涉窗口 3／6', { exact: true }).waitFor();
   await page.getByRole('button', { name: '提交並推進', exact: true }).click();
   await page.getByRole('button', { name: '確認秘密選色', exact: true }).waitFor();
   await page.getByLabel('紅色', { exact: true }).check();

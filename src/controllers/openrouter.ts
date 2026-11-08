@@ -3,6 +3,7 @@ import { parseDecision } from '../contracts/schema.ts';
 import { object } from '../contracts/validation.ts';
 import type { SessionConfig } from '../domain/config.ts';
 import { SYSTEM_PROMPT, decisionSchemaFor } from './prompt.ts';
+import { providerInput } from './provider-input.ts';
 export type AuditSink = (snapshotId: string, record: Record<string, unknown>) => void;
 export class ProviderDecisionError extends Error {
   readonly code: string; readonly retryable: boolean;
@@ -17,7 +18,7 @@ export class OpenRouterController implements AgentController {
   async decide(input: Readonly<DecisionInput>, signal: AbortSignal, validationFeedback?: string): Promise<DecisionResult> {
     const body = { ...this.llm.parameters, model: this.llm.model, stream: false,
       provider: { require_parameters: true },
-      messages: [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: JSON.stringify(input) },
+      messages: [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: JSON.stringify(providerInput(input)) },
         { role: 'user', content: `${validationFeedback ?? 'Protocol reminder:'} ${input.ownNotes.length ? `目標延續規則：上次goal為${JSON.stringify(input.ownNotes.at(-1)!.goal)}。目標不變請逐字沿用；只要goal文字不同，就必須填寫非空白的revisionReason，不可為null。` : ''} Use EXACT action shapes from this JSON Schema. ${JSON.stringify(decisionSchemaFor(input))}` }],
       response_format: { type: 'json_schema', json_schema: { name: 'minority_decision', strict: true, schema: decisionSchemaFor(input) } } };
     const started = Date.now(); let responseBody: string | null = null; let status: number | null = null;

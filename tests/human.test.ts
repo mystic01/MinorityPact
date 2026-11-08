@@ -20,7 +20,7 @@ const answer = (i: DecisionInput): DecisionResult => ({ actions: i.phase === 'co
     { type: 'send_public_message' as const, actionId: 'm', message: 'BATCH_PUBLIC', scheduledTimeMs: 0 },
   ] : [])], nextWake: { onEvents: [] }, strategyNote: { goal: 'win', plan: 'PRIVATE_PLAN', whyThisAction: 'test', predictedOutcome: 'unknown', observedEventIds: [] } });
 
-test('human HTTP mode preserves simultaneous privacy, ten windows, locked submission and secret vote', async () => {
+test('human HTTP mode preserves simultaneous privacy, six windows, locked submission and secret vote', async () => {
   const c = config(), store = new SqliteEventStore(':memory:'); store.createSession('h', c);
   const inputs: DecisionInput[] = [];
   const app = createApp({ store, config: c, pace: async () => {}, controllers: () => Object.fromEntries(c.players.map(id => [id, { decide: async (i: DecisionInput) => { assert.notEqual(i.agentId, 'A'); inputs.push(i); return answer(i); } }])) });
@@ -62,7 +62,7 @@ test('human HTTP mode preserves simultaneous privacy, ten windows, locked submis
         : { snapshotId: p.pending.snapshotId, messages: [], ready: p.pending.round > 1 };
       assert.equal((await post('human-submit', body)).status, 200);
     }
-    assert.equal(firstRoundWindows, 10);
+    assert.equal(firstRoundWindows, 6);
     const done = await get('/api/sessions/h'); assert.equal(done.status, 'completed');
     assert.equal(done.state.outcome.agentId, 'A');
     assert.equal((await post('human-submit', { snapshotId: initial.pending.snapshotId, messages: [], ready: false })).status, 400);
