@@ -1,0 +1,45 @@
+import type { AgentController, DecisionInput, DecisionResult } from '../contracts/decision.ts';
+import { parseDecision } from '../contracts/schema.ts';
+import { object } from '../contracts/validation.ts';
+import type { SessionConfig } from '../domain/config.ts';
+import { SYSTEM_PROMPT, DECISION_SCHEMA } from './prompt.ts';
+export type AuditSink = (snapshotId: string, record: Record<string, unknown>) => void;
+export class OpenRouterController implements AgentController {
+  private llm: SessionConfig['llm']; private key: string; private fetcher: typeof fetch; private audit: AuditSink;
+  constructor(llm: SessionConfig['llm'], key: string, audit: AuditSink, fetcher: typeof fetch = fetch) {
+    if (!key.trim() || !llm.model.trim()) throw new Error('OpenRouter key and model required');
+    this.llm = structuredClone(llm); this.key = key; this.audit = audit; this.fetcher = fetcher;
+  }
+  async decide(input: Readonly<DecisionInput>, signal: AbortSignal): Promise<DecisionResult> {
+    const body = { ...this.llm.parameters, model: this.llm.model, stream: false,
+      provider: { require_parameters: true },
+      messages: [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: JSON.stringify(input) }],
+      response_format: { type: 'json_schema', json_schema: { name: 'minority_decision', strict: true, schema: DECISION_SCHEMA } } };
+    const started = Date.now(); let responseBody: string | null = null; let status: number | null = null;
+    const redact = (value: unknown): unknown => JSON.parse(JSON.stringify(value).split(this.key).join('[REDACTED]'));
+    try {
+      const response = await this.fetcher('https://openrouter.ai/api/v1/chat/completions', { method: 'POST', signal,
+        headers: { Authorization: `Bearer ${this.key}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      status = response.status; responseBody = await response.text();
+      if (!response.ok) throw new Error('HTTP failure');
+      const data = object(JSON.parse(responseBody));
+      if (data.error || data.model !== this.llm.model) throw new Error('Model mismatch or provider error');
+      if (!Array.isArray(data.choices) || data.choices.length !== 1) throw new Error('Expected one choice');
+      const choice = object(data.choices[0]);
+      if (choice.finish_reason !== 'stop') throw new Error('Truncated or refused response');
+      const message = object(choice.message);
+      if (message.refusal || typeof message.content !== 'string') throw new Error('No usable output');
+      const parsed = object(JSON.parse(message.content));
+      const wake = object(parsed.nextWake); const note = object(parsed.strategyNote);
+      if (wake.atGameTimeMs === null) delete wake.atGameTimeMs;
+      if (note.revisionReason === null) delete note.revisionReason;
+      const result = parseDecision(parsed);
+      this.audit(input.snapshotId, redact({ kind: 'provider_response', success: true, started, finished: Date.now(), status, request: body, rawResponse: responseBody }) as Record<string, unknown>);
+      return result;
+    } catch {
+      this.audit(input.snapshotId, redact({ kind: 'provider_response', success: false, started, finished: Date.now(), status, request: body, rawResponse: responseBody }) as Record<string, unknown>);
+      // Never propagate response bodies, private input or fetch error strings to the public surface.
+      throw new Error('OpenRouter decision failed; inspect private audit');
+    }
+  }
+}

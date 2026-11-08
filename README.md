@@ -17,3 +17,23 @@ Node 原生執行 TypeScript 測試，不需測試框架或 API key。TypeScript
 `src/contracts/public.ts` 為公開 DTO；`DecisionInput` 是僅可交給對應 controller 的授權資料；`src/domain/engine.ts` 與 `application/ports.ts` 的內部事件含秘密，不得直接序列化對外。對外事件讀取走 `ReplayService`，以可信身分產生投影；`projectEvent` 為內部工具，不能直接由 HTTP 參數開啟全知。SQLite 使用 Node 內建 `node:sqlite`，已在本機 Node 24.22.1 驗證。
 
 規則、時間與政策細節見 `ARCHITECTURE.md`；後續任務見 `IMPLEMENTATION_PLAN.md`，實際驗證狀態見 `docs/PROGRESS.md`。
+
+## OpenRouter 命令列對局
+
+複製 `configs/experimental.json` 為 `configs/local.json`，填入 `llm.model` 的完整 OpenRouter 模型 ID，可選填 `displayName`。模型需支援 JSON Schema 結構化輸出與設定中的參數；不支援時會暫停，不自動換模型。五席使用同一設定；推理模型可在共同 parameters.reasoning 設定資源。
+
+```powershell
+Copy-Item configs/experimental.json configs/local.json
+# 編輯 configs/local.json，填入模型 ID
+npm.cmd run game -- check configs/local.json
+# 在本機 .env 設定 OPENROUTER_API_KEY，或設定同名環境變數
+npm.cmd run game -- start configs/local.json data/games.sqlite
+# 失敗後使用畫面上的 SESSION_ID 恢復同局
+npm.cmd run game -- resume configs/local.json data/games.sqlite SESSION_ID
+```
+
+`check` 不發送 API 請求，`start/resume` 會呼叫付費模型。resume 使用資料庫中原始模型／規則，修改設定只影響新局。CLI 只印公開投影；私訊原文、策略與原始 provider 回應在 SQLite 私有資料內，勿直接分享資料庫。
+
+CLI 依真實時間等待邏輯時間間隔，LLM 推理期間停鐘。失敗最多重試 2 次後保留 pending decisions，退出並允許 resume。資料庫旁 `.lock` 防止兩個 CLI 同時執行；若程序被強制終止留下 lock，確認沒有對局程序仍執行後再手動移除 lock。不要同時以其他程式寫入同一資料庫。
+
+目前尚未有真正 LLM 對局驗收；模擬 HTTP 測試僅證明串接與流程，不證明模型策略能力。API 實作參考 [OpenRouter API](https://openrouter.ai/docs/api_reference/overview) 與 [Structured Outputs](https://openrouter.ai/docs/guides/features/structured-outputs)。

@@ -6,7 +6,8 @@
   "engines": { "node": ">=24" },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "node --test tests/*.test.ts"
+    "test": "node --test tests/*.test.ts",
+    "game": "node --env-file-if-exists=.env src/cli.ts"
   },
   "devDependencies": { "typescript": "5.9.3", "@types/node": "24.10.1" }
 }

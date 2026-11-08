@@ -12,14 +12,24 @@ export class SqliteEventStore implements EventStore {
     this.db.exec(`PRAGMA foreign_keys=ON;
       PRAGMA journal_mode=WAL;
       CREATE TABLE IF NOT EXISTS migrations(version INTEGER PRIMARY KEY);
+      CREATE TABLE IF NOT EXISTS decision_audit(id INTEGER PRIMARY KEY, session_id TEXT NOT NULL REFERENCES sessions(id), snapshot_id TEXT NOT NULL, record TEXT NOT NULL);
+      CREATE TRIGGER IF NOT EXISTS audit_no_update BEFORE UPDATE ON decision_audit BEGIN SELECT RAISE(ABORT,'append-only audit'); END;
+      CREATE TRIGGER IF NOT EXISTS audit_no_delete BEFORE DELETE ON decision_audit BEGIN SELECT RAISE(ABORT,'append-only audit'); END;
       CREATE TABLE IF NOT EXISTS sessions(id TEXT PRIMARY KEY, config TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 0, checkpoint TEXT);
       CREATE TABLE IF NOT EXISTS batches(session_id TEXT NOT NULL REFERENCES sessions(id), id TEXT NOT NULL, fingerprint TEXT NOT NULL, version INTEGER NOT NULL, PRIMARY KEY(session_id,id));
       CREATE TABLE IF NOT EXISTS events(session_id TEXT NOT NULL REFERENCES sessions(id), seq INTEGER NOT NULL, event_id TEXT NOT NULL UNIQUE, batch_id TEXT NOT NULL, data TEXT NOT NULL, PRIMARY KEY(session_id,seq));
       CREATE TRIGGER IF NOT EXISTS events_no_update BEFORE UPDATE ON events BEGIN SELECT RAISE(ABORT,'append-only events'); END;
       CREATE TRIGGER IF NOT EXISTS events_no_delete BEFORE DELETE ON events BEGIN SELECT RAISE(ABORT,'append-only events'); END;
-      INSERT OR IGNORE INTO migrations VALUES(1);`);
+      INSERT OR IGNORE INTO migrations VALUES(1);
+      INSERT OR IGNORE INTO migrations VALUES(2);`);
   }
   close(): void { this.db.close(); }
+  recordAudit(sessionId: string, snapshotId: string, record: Record<string, unknown>): void {
+    this.db.prepare('INSERT INTO decision_audit(session_id,snapshot_id,record) VALUES(?,?,?)').run(sessionId, snapshotId, JSON.stringify(record));
+  }
+  readAudit(sessionId: string): Record<string, unknown>[] {
+    return this.db.prepare('SELECT record FROM decision_audit WHERE session_id=? ORDER BY id').all(sessionId).map(row => JSON.parse(String(row.record)) as Record<string, unknown>);
+  }
   getVersion(id: string): number {
     const row = this.db.prepare('SELECT version FROM sessions WHERE id=?').get(id);
     if (!row) throw new Error('Unknown session');

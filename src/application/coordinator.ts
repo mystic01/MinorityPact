@@ -74,7 +74,7 @@ export class DecisionCoordinator {
         const visible = history.map(e => projectEvent(e, { kind: 'agent', agentId })).filter(e => e !== null);
         const snapshotId = `${batchId}:${agentId}:${history.length}`;
         const input: DecisionInput = { sessionId: this.sessionId, round: state.round, phase: state.phase, logicalTimeMs: time, batchId, snapshotId, agentId,
-          rulesVersion: config.rulesVersion, publicRules: JSON.stringify({ objective: 'unique final champion; second place has no victory value', ranking: ['total_score_desc', 'minority_wins_desc', 'draw'], players: config.players, rounds: config.rounds, scoring: config.scoring, negotiationTimeMs: config.negotiationTimeMs, policies: config.policies, scheduling: config.scheduling }),
+          rulesVersion: config.rulesVersion, publicRules: JSON.stringify({ objective: 'unique final champion; second place has no victory value', ranking: ['total_score_desc', 'minority_wins_desc', 'draw'], players: config.players, rounds: config.rounds, scoring: config.scoring, roundStartedMs: state.roundStartedMs, negotiationDeadlineMs: state.roundStartedMs + config.negotiationTimeMs, negotiationTimeMs: config.negotiationTimeMs, policies: config.policies, scheduling: config.scheduling }),
           standings: structuredClone(state.standings), history: visible,
           privateMessages: history.flatMap(e => e.data.type === 'private_message_sent' && [e.data.actorId, e.data.recipientId].includes(agentId) ? [{ eventId: e.eventId, sender: e.data.actorId, recipient: e.data.recipientId, body: e.data.body }] : []),
           ownNotes: history.flatMap(e => e.data.type === 'strategy_note' && e.data.actorId === agentId ? [e.data.note] : []), wakeReasons: [cp.initialized ? 'scheduled' : 'phase_started'] };
@@ -94,7 +94,10 @@ export class DecisionCoordinator {
           const result = parseDecision(raw); this.validate(result, pending.snapshot.input, state, config);
           pending.result = result;
           writes = writes.then(() => this.save(cp)); await writes; return;
-        } catch (error) { last = error; }
+        } catch (error) {
+          this.store.recordAudit(this.sessionId, pending.snapshot.snapshotId, { kind: 'decision_rejected', attempt: attempt + 1, reason: error instanceof Error ? error.message : 'Unknown error' });
+          last = error;
+        }
       }
       throw last;
     }));
