@@ -70,4 +70,6 @@ FROM decision_audit ORDER BY id DESC LIMIT 50;
 
 ## 手動檔案模式
 
+Windows 可直接雙擊根目錄的 `start-game.bat`：自動建置、啟動伺服器並開啟遊戲網頁。需先安裝 Node.js 24 以上，首次使用先在專案目錄執行 `npm.cmd ci`。遊玩時保留終端視窗，結束時按 Ctrl+C；啟動器不會自動開局或呼叫付費 API。若瀏覽器未自動開啟，前往 http://127.0.0.1:3000。
+
 網頁新對局選「手動檔案（自動檢查回覆）」。每席 Markdown 可整份貼給 AI，答案貼回同檔指定區並儲存；網頁自動顯示進度，收齊後前進。詳見 [完整說明](docs/MANUAL_MODE.md)。

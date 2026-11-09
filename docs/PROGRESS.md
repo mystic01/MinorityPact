@@ -111,3 +111,10 @@ T1/T2 程式已實作；規則測試通過，**型別檢查尚未驗證成功，
 - 驗證：npm.cmd run typecheck、npm.cmd run web:check、npm.cmd run build 通過；npm.cmd test 118/118 通過。npm.cmd run test:browser 既有 Chrome scripted QA 通過。
 - 新增 tests/manual-file.test.ts：錯誤請求編號、部分回覆、時鐘凍結、資料庫重開與完整五回合 scripted game 通過。tests/manual-browser.ts：無 API key 開局、五席狀態、破損 JSON 修正、部分接受不公開、收齊自動進入投票、暫停及伺服器重啟續接通過；截圖位於忽略目錄 .npm-cache/browser-qa/manual-progress.png。
 - 開發中曾修正 Node strip-only 不支援參數屬性及 PowerShell 管線中文編碼問題；最終型別、瀏覽器與單元驗證通過。全部為離線 scripted/mock 驗證，未呼叫付費 API，未續接既有真正多模型 smoke，不能視為真實十回合或策略品質驗收。
+
+## 2026-11-09 Windows 啟動器
+
+- 新增根目錄 start-game.bat，定位專案目錄，檢查 Node.js 24+、npm 與已安裝依賴，建置前端後啟動伺服器；背景等待首頁可用再開啟瀏覽器，錯誤時保留視窗供閱讀。不自動開局、不執行付費 API。
+- README 補上雙擊操作、首次 npm.cmd ci、Ctrl+C 停止及手動開啟網址說明。
+- 驗證：cmd.exe /c start-game.bat --check 通過（前置檢查與實際 Vite build）；npm.cmd run typecheck、npm.cmd run web:check 通過；npm.cmd test 118/118 通過，全部為離線測試。
+- 本次未實際啟動 GUI 瀏覽器或既有遊戲伺服器，雙擊後自動開頁流程未做端到端驗收；未續接真正多模型 smoke。
