@@ -19,6 +19,20 @@ const page = await browser.newPage({ viewport: { width: 1440, height: 1100 } });
 const errors: string[] = []; page.on('pageerror', e => errors.push(e.message));
 try {
   await page.goto(`http://127.0.0.1:${(app.server.address() as AddressInfo).port}`);
+  // A newly built frontend must explain an older backend instead of posting unsupported settings.
+  let postsToCreate = 0;
+  page.on('request', req => { if (req.method() === 'POST' && new URL(req.url()).pathname === '/api/sessions') postsToCreate++; });
+  await page.route('**/api/bootstrap', async route => {
+    const response = await route.fetch(); const data = await response.json(); delete data.manualHumanSupported;
+    await route.fulfill({ response, json: data });
+  });
+  await page.reload();
+  await page.getByLabel('AI 連接方式').selectOption('manual_file');
+  await page.getByLabel('真人席位').selectOption('C');
+  await page.getByRole('button', { name: '建立新對局 ＋' }).click();
+  await page.getByRole('alert').filter({ hasText: '目前執行中的伺服器版本不支援' }).waitFor();
+  assert.equal(postsToCreate, 0);
+  await page.unroute('**/api/bootstrap'); await page.reload();
   await page.getByLabel('AI 連接方式').selectOption('manual_file');
   await page.getByRole('button', { name: '建立新對局 ＋' }).click();
   await page.getByRole('button', { name: '開始對局', exact: true }).click();
@@ -56,12 +70,12 @@ try {
   await page.waitForTimeout(1200);
   await page.getByRole('button', { name: '新對局 ＋', exact: true }).click();
   await page.getByLabel('AI 連接方式').selectOption('manual_file');
-  await page.getByLabel('真人席位').selectOption('A');
+  await page.getByLabel('真人席位').selectOption('C');
   await page.getByRole('button', { name: '建立新對局 ＋' }).click();
   id = store.listSessions()[0]!;
   await page.getByRole('button', { name: '開始對局', exact: true }).click();
   await page.waitForFunction(() => [...document.querySelectorAll('.manual-players [role=status]')].filter(e => e.textContent === '等待回覆').length === 4);
-  assert.equal(existsSync(join(root, id, 'player-A.md')), false);
+  assert.equal(existsSync(join(root, id, 'player-C.md')), false);
   assert.equal(readdirSync(join(root, id)).filter(name => name.endsWith('.md')).length, 4);
   await page.getByLabel('我已準備投票（可在後續窗口撤回）').check();
   await page.getByRole('button', { name: '提交並推進', exact: true }).click();
@@ -69,9 +83,9 @@ try {
   assert.equal((await store.readEvents(id, 0)).length, 0);
   await page.reload();
   await page.getByText('你已提交', { exact: true }).waitFor();
-  for (const seat of ['B', 'C', 'D', 'E']) await fill(seat);
+  for (const seat of ['A', 'B', 'D', 'E']) await fill(seat);
   await page.getByRole('button', { name: '確認秘密選色', exact: true }).waitFor();
-  for (const seat of ['B', 'C', 'D', 'E']) await fill(seat);
+  for (const seat of ['A', 'B', 'D', 'E']) await fill(seat);
   await page.waitForFunction(() => [...document.querySelectorAll('.manual-players [role=status]')].filter(e => e.textContent === '已接受').length === 4);
   assert.ok(!(await store.readEvents(id, 0)).some(e => e.data.type === 'votes_revealed'));
   await page.getByLabel('紅色', { exact: true }).check();

@@ -19,6 +19,7 @@ const stageSpeech = ref<PublicEvent | null>(null);
 const feedFilter = ref('all');
 const setupOpen = ref(false);
 const decisionMode = ref('api');
+const serverSupportsManualHuman = ref(false);
 const manual = ref<{ enabled: boolean; directory?: string; players?: { seat: string; file: string | null; status: string; round?: number; phase?: string }[] } | null>(null);
 const humanSeat = ref(''), humanOpen = ref(false), submitting = ref(false);
 watch(humanSeat, seat => { if (seat && config.value) config.value.scheduling.mode = 'fixed_5s'; });
@@ -100,7 +101,7 @@ async function watchSession() {
   } catch (e) { error.value = String(e); }
 }
 async function createSession() {
-  try { error.value = ''; const nextConfig = structuredClone(JSON.parse(JSON.stringify(config.value))); delete nextConfig.humanSeat; delete nextConfig.decisionMode; if (decisionMode.value === 'manual_file') nextConfig.decisionMode = 'manual_file'; if (humanSeat.value) { nextConfig.humanSeat = humanSeat.value; nextConfig.scheduling.mode = 'fixed_5s'; nextConfig.policies.messageTiming = 'immediate'; } const created = await api('/api/sessions', nextConfig); await refreshList(); selected.value = created.id; setupOpen.value = false; await watchSession(); }
+  try { error.value = ''; if (decisionMode.value === 'manual_file' && humanSeat.value && !serverSupportsManualHuman.value) throw new Error('目前執行中的伺服器版本不支援手動 AI＋真人。請在原啟動視窗按 Ctrl+C 停止伺服器，再重新執行 start-game.bat，並重新整理網頁。'); const nextConfig = structuredClone(JSON.parse(JSON.stringify(config.value))); delete nextConfig.humanSeat; delete nextConfig.decisionMode; if (decisionMode.value === 'manual_file') nextConfig.decisionMode = 'manual_file'; if (humanSeat.value) { nextConfig.humanSeat = humanSeat.value; nextConfig.scheduling.mode = 'fixed_5s'; nextConfig.policies.messageTiming = 'immediate'; } const created = await api('/api/sessions', nextConfig); await refreshList(); selected.value = created.id; setupOpen.value = false; await watchSession(); }
   catch (e) { error.value = String(e); }
 }
 async function command(action: string) { try { error.value = ''; await api(`/api/sessions/${selected.value}/${action}`, {}); } catch (e) { error.value = String(e); } }
@@ -139,7 +140,7 @@ function describe(e: PublicEvent): string {
   }
 }
 onMounted(async () => {
-  try { const initial = await api('/api/bootstrap'); token.value = initial.token; hasKey.value = initial.hasKey; config.value = initial.config; await refreshList(); if (ids.value[0]) { selected.value = ids.value[0]; await watchSession(); } }
+  try { const initial = await api('/api/bootstrap'); token.value = initial.token; hasKey.value = initial.hasKey; serverSupportsManualHuman.value = initial.manualHumanSupported === true; config.value = initial.config; await refreshList(); if (ids.value[0]) { selected.value = ids.value[0]; await watchSession(); } }
   catch (e) { error.value = String(e); }
   timer = setInterval(() => { void refreshPlayer().catch(() => {}); if (playing.value && replayMode.value) { const next = advancePlayback(timeline, playhead, 250, speed.value); playhead = next.logicalTimeMs; if (next.cursor !== cursor.value) { cursor.value = next.cursor; void seek(true); } if (next.ended) playing.value = false; } }, 250);
 });

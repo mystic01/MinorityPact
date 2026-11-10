@@ -24,6 +24,16 @@ if not exist "node_modules\vite\bin\vite.js" (
   goto failed
 )
 
+if /i not "%~1"=="--check" (
+  powershell.exe -NoProfile -Command "$client = [System.Net.Sockets.TcpClient]::new(); try { $client.Connect('127.0.0.1', 3000); exit 1 } catch { exit 0 } finally { $client.Dispose() }"
+  if errorlevel 1 (
+    echo Port 3000 is already in use. A previous game server may still be running.
+    echo Press Ctrl+C in its original window, then run start-game.bat again.
+    echo Restarting is required after updates. Rebuilding alone does not reload the server.
+    goto failed
+  )
+)
+
 echo Building Minority Pact...
 call npm.cmd run build
 if errorlevel 1 goto failed

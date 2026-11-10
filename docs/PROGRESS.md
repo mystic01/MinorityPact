@@ -153,3 +153,12 @@ T1/T2 程式已實作；規則測試通過，**型別檢查尚未驗證成功，
 - 驗證：npm.cmd run typecheck、npm.cmd run web:check、npm.cmd run build 通過；npm.cmd test 129/129 通過。新增 manual-human.test.ts 驗證無真人檔案、真人先交、部分 AI 接受、提交不可改寫、同批快照不洩漏、遊戲時間凍結、磁碟關閉重開、AI 先投票保密與統一揭曉；其等待真人時重啟的擴充案例另行定向測試通過。
 - Chrome：test:manual-browser 通過，涵蓋五 AI 舊流程與一真人四 AI、真人網頁提交／刷新、四份檔案、AI 先投票與下一回合接續。test:browser、test:contracts-browser 通過。已檢視 .npm-cache/browser-qa/manual-human.png（忽略產物）。測試切換前一局中止後等待其一秒輪詢循環退出，再開下一局。
 - 全部離線驗證，無 API key、無付費測試，未續接真正多模型 smoke，不代表真實 AI 策略或十回合驗收。
+
+## 2026-11-10 手動模式真人 C 建立失敗排查
+
+- 重現現行 3000 埠服務收到手動＋真人 C 設定時回 HTTP 400；將該服務 bootstrap 的完全相同設定送到最新版隔離後端回 201。另驗證最新版 A～E 均可建立。定位為執行中舊後端與新前端不相容，無須更改 API key；沒有強制終止使用者服務。
+- bootstrap 新增 manualHumanSupported，前端在舊後端未宣告支援時阻止送出並明確提示 Ctrl+C、重新執行 start-game.bat、重新整理網頁，取代籠統 key／設定錯誤。
+- bat 在建置前檢查 3000 埠，已占用則明確要求先停止舊服務，不再建置新前端並連上舊程序。--check 保留純檢查／建置用途。
+- 驗證：typecheck、web:check、build、cmd.exe /c start-game.bat --check 通過；npm.cmd test 129/129 通過。已針對現行占用埠執行 bat，確認回傳 1 並在建置／啟動瀏覽器前停止。
+- test:browser 回歸通過；test:manual-browser 通過，新增模擬舊 bootstrap 不具能力標記時的清楚提示與零建局請求，以及真人 C 的四份 AI 檔案、網頁提交、重新整理、AI 先投票保密與下一輪接續。
+- 全部隔離測試離線，無付費 API，未續接真正多模型 smoke。現行舊服務需使用者在原視窗 Ctrl+C 後重啟，以避免強制關閉或干預進行中的遊戲。
