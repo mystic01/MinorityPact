@@ -1,8 +1,9 @@
 {
   "schemaVersion": 1,
   "experimental": true,
-  "rulesVersion": "minority-pact-v4-30s",
-  "promptVersion": "v5-zh-TW-deduplicated",
+  "rulesVersion": "minority-pact-v5-contracts",
+  "promptVersion": "v6-zh-TW-contracts",
+  "contractsEnabled": true,
   "seed": "experiment-1",
   "players": ["A", "B", "C", "D", "E"],
   "rounds": 10,

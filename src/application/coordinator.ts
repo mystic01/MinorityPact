@@ -81,7 +81,7 @@ export class DecisionCoordinator {
         const visible = history.map(e => projectEvent(e, { kind: 'agent', agentId })).filter(e => e !== null);
         const snapshotId = `${batchId}:${agentId}:${history.length}`;
         const input: DecisionInput = { sessionId: this.sessionId, round: state.round, phase: state.phase, logicalTimeMs: time, batchId, snapshotId, agentId,
-          rulesVersion: config.rulesVersion, publicRules: JSON.stringify({ objective: 'unique final champion; second place has no victory value', ranking: ['total_score_desc', 'minority_wins_desc', 'draw'], players: config.players, rounds: config.rounds, scoring: config.scoring, roundStartedMs: state.roundStartedMs, negotiationDeadlineMs: state.roundStartedMs + config.negotiationTimeMs, negotiationTimeMs: config.negotiationTimeMs, policies: config.policies, scheduling: config.scheduling }),
+          rulesVersion: config.rulesVersion, publicRules: JSON.stringify({ ...(config.contractsEnabled ? { contractsEnabled: true } : {}), objective: 'unique final champion; second place has no victory value', ranking: ['total_score_desc', 'minority_wins_desc', 'draw'], players: config.players, rounds: config.rounds, scoring: config.scoring, roundStartedMs: state.roundStartedMs, negotiationDeadlineMs: state.roundStartedMs + config.negotiationTimeMs, negotiationTimeMs: config.negotiationTimeMs, policies: config.policies, scheduling: config.scheduling }),
           standings: structuredClone(state.standings), history: visible,
           newEventIds: visible.filter(e => e.commitSeq > (cp.lastObservedSeq?.[agentId] ?? 0)).map(e => e.eventId),
           privateMessages: history.flatMap(e => e.data.type === 'private_message_sent' && [e.data.actorId, e.data.recipientId].includes(agentId) ? [{ eventId: e.eventId, sender: e.data.actorId, recipient: e.data.recipientId, body: e.data.body }] : []),
@@ -148,6 +148,7 @@ export class DecisionCoordinator {
   private queueWakes(events: DomainEvent[], cp: SchedulerCheckpoint, c: SessionConfig, state: GameState): void {
     cp.wakeQueue ??= {};
     for (const e of events) for (const id of c.players) {
+      if ((e.type === 'contract_updated' && [e.contract.payer, e.contract.recipient].includes(id)) || (e.type === 'contract_rejected' && e.actorId === id)) cp.wakeQueue[id] = Math.min(cp.wakeQueue[id] ?? Infinity, alignTime(cp.logicalTimeMs + c.scheduling.eventReactionMs, c, state.roundStartedMs));
       const kind = e.type === 'private_message_sent' && e.recipientId === id ? 'private_message_received' : e.type === 'public_message' && e.actorId !== id ? 'public_message_received' : null;
       if (kind && (cp.subscriptions[id]?.onEvents.includes(kind) || kind === 'private_message_received' && c.scheduling.privateMessageWake === 'always')) cp.wakeQueue[id] = Math.min(cp.wakeQueue[id] ?? Infinity, alignTime(cp.logicalTimeMs + c.scheduling.eventReactionMs, c, state.roundStartedMs));
     }
@@ -160,6 +161,10 @@ export class DecisionCoordinator {
     if (r.nextWake.atGameTimeMs !== undefined && r.nextWake.atGameTimeMs <= input.logicalTimeMs) throw new Error('Wake must be in future');
     if (s.phase === 'commit' && (r.actions.length !== 1 || r.actions[0]!.type !== 'vote')) throw new Error('Commit requires one vote');
     for (const a of r.actions) {
+      if (a.type.includes('contract')) {
+        if (!c.contractsEnabled || s.phase !== 'negotiation' || a.scheduledTimeMs !== input.logicalTimeMs) throw new Error('Contracts require enabled negotiation and current time');
+        if (a.type === 'propose_contract' && (a.recipientId === input.agentId || !c.players.includes(a.recipientId))) throw new Error('Invalid recipient');
+      }
       if (a.scheduledTimeMs < input.logicalTimeMs || s.phase === 'commit' && a.scheduledTimeMs !== input.logicalTimeMs) throw new Error('Invalid action time');
       if (c.policies.messageTiming === 'immediate' && (a.type === 'send_public_message' || a.type === 'send_private_message') && a.scheduledTimeMs !== input.logicalTimeMs) throw new Error('Messages must use current logicalTimeMs; schedule nextWake to reconsider later');
       if (s.phase === 'negotiation' && (a.type === 'vote' || alignTime(a.scheduledTimeMs, c, s.roundStartedMs) >= s.roundStartedMs + c.negotiationTimeMs)) throw new Error('Action outside negotiation');

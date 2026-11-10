@@ -1,5 +1,6 @@
 import { array, integer, keys, object, oneOf, text } from '../contracts/validation.ts';
 export interface Rules {
+  contractsEnabled?: boolean;
   players: string[]; rounds: number; negotiationTimeMs: number;
   scoring: { policy: 'exclusive' | 'zero_sum'; solo: number; pair: number; majority: number };
   policies: { ready: 'revocable_quiet_batch'; vote: 'commit_once'; simultaneous: 'next_batch'; messageTiming?: 'immediate' | 'scheduled' };
@@ -14,7 +15,7 @@ export interface SessionConfig extends Rules {
 }
 export function parseConfig(value: unknown): SessionConfig {
   const v = object(value);
-  keys(v, ['schemaVersion', 'experimental', 'rulesVersion', 'promptVersion', 'seed', 'players', 'rounds', 'negotiationTimeMs', 'scoring', 'policies', 'scheduling', 'llm', 'seatModels', 'humanSeat', 'decisionMode']);
+  keys(v, ['schemaVersion', 'experimental', 'rulesVersion', 'promptVersion', 'seed', 'players', 'rounds', 'negotiationTimeMs', 'scoring', 'policies', 'scheduling', 'llm', 'seatModels', 'humanSeat', 'decisionMode', 'contractsEnabled']);
   if (v.schemaVersion !== 1 || v.experimental !== true) throw new Error('Expected experimental schema v1');
   const players = array(v.players).map(text);
   if (players.length !== 5 || new Set(players).size !== 5 || players.some(id => !/^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(id) || ['__proto__', 'constructor', 'prototype'].includes(id))) throw new Error('Exactly five distinct safe seat IDs required');
@@ -50,9 +51,11 @@ export function parseConfig(value: unknown): SessionConfig {
     }));
   }
   if (v.humanSeat !== undefined && (!players.includes(text(v.humanSeat)) || t.mode !== 'fixed_5s' || p.messageTiming !== 'immediate')) throw new Error('Human mode requires a valid seat, fixed_5s and immediate messages');
+  if (v.contractsEnabled !== undefined && typeof v.contractsEnabled !== 'boolean') throw new Error('Invalid contracts setting');
   if (v.decisionMode !== undefined) oneOf(v.decisionMode, ['manual_file']);
   if (v.decisionMode === 'manual_file' && v.humanSeat) throw new Error('Manual files require all AI seats');
   return {
+    ...(v.contractsEnabled === undefined ? {} : { contractsEnabled: v.contractsEnabled as boolean }),
     ...(v.decisionMode === 'manual_file' ? { decisionMode: 'manual_file' as const } : {}),
     ...(v.humanSeat === undefined ? {} : { humanSeat: text(v.humanSeat) }),
     ...(seatModels === undefined ? {} : { seatModels }),

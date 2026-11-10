@@ -17,7 +17,8 @@
     "experiment": "node src/experiments/cli.ts",
     "test:browser": "node tests/browser-smoke.ts",
     "assets:check": "node scripts/validate-avatars.ts",
-    "test:manual-browser": "node tests/manual-browser.ts"
+    "test:manual-browser": "node tests/manual-browser.ts",
+    "test:contracts-browser": "node tests/contracts-browser.ts"
   },
   "devDependencies": {
     "@types/node": "24.10.1",

@@ -1,8 +1,11 @@
+import type { PaymentCondition } from './payment.ts';
 import type { AgentId, Color, Phase, PublicEvent, Standing } from './public.ts';
 export type Action = { actionId: string; scheduledTimeMs: number } & (
   | { type: 'send_public_message'; message: string }
   | { type: 'send_private_message'; recipientId: AgentId; message: string }
   | { type: 'set_ready'; ready: boolean }
+  | { type: 'propose_contract'; recipientId: AgentId; amount: number; condition: PaymentCondition }
+  | { type: 'accept_contract' | 'cancel_contract'; contractId: string }
   | { type: 'vote'; color: Color }
 );
 export interface StrategyNote {

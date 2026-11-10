@@ -118,3 +118,12 @@ T1/T2 程式已實作；規則測試通過，**型別檢查尚未驗證成功，
 - README 補上雙擊操作、首次 npm.cmd ci、Ctrl+C 停止及手動開啟網址說明。
 - 驗證：cmd.exe /c start-game.bat --check 通過（前置檢查與實際 Vite build）；npm.cmd run typecheck、npm.cmd run web:check 通過；npm.cmd test 118/118 通過，全部為離線測試。
 - 本次未實際啟動 GUI 瀏覽器或既有遊戲伺服器，雙擊後自動開頁流程未做端到端驗收；未續接真正多模型 smoke。
+## 2026-11-10 雙人契約付款
+
+- 依使用者逐項確認新增三類固定條款，提案人自訂正整數金額；一份只涉及兩人，可多份並存，收款人接受才成立，成立後須雙方在交涉期同意才解除。
+- 新局範本 contractsEnabled=true，網頁可關閉；舊局缺省關閉，不改寫任何舊局。API、手動 Markdown、真人介面均支援。契約通知只投影給雙方且於下一窗口喚醒，不提前公開本批行動；終局全知重播可查看歷史。
+- 內部結算依付款人彙總已觸發付款，只用累積總分＋原始獎金判斷，入款不補額度。不足則該付款人的觸發付款全部歸零，向雙方通知「付款人支付能力不足」；剛好足額全付。總分依實付調整，勝次依原始選色保留。公開只發一次分數淨額事件。
+- 玩家提示、動態 schema、操作文件不提前揭露隱藏門檻；內部規格單獨保存在 docs/CONTRACTS_INTERNAL.md，玩家操作見 docs/CONTRACTS.md。
+- 驗證：npm.cmd run typecheck、npm.cmd run web:check、npm.cmd run build 通過；npm.cmd test 126/126 通過（新增 8 項契約測試，含門檻、隱私、通知喚醒、磁碟重開與完整五回合 scripted 對局）。
+- Chrome QA：npm.cmd run test:browser、npm.cmd run test:manual-browser、npm.cmd run test:contracts-browser 全部通過；新測試包含真人提案、腳本 AI 接受、私人通知、雙方解除與公開觀戰不洩漏契約。截圖 .npm-cache/browser-qa/contracts.png 為忽略的本地產物。
+- 全部驗證離線，沒有付費請求，沒有續接真正多模型 smoke。腳本測試不代表真實 AI 已能自主發現隱藏機制。

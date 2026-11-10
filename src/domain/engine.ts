@@ -1,14 +1,20 @@
+import type { PaymentContract } from '../contracts/payment.ts';
+import { settlePayments } from './payments.ts';
 import type { Action } from '../contracts/decision.ts';
 import type { Color, Outcome, Phase, Standing } from '../contracts/public.ts';
 import { parseAction } from '../contracts/schema.ts';
 import type { Rules } from './config.ts';
 import type { StrategyNote } from '../contracts/decision.ts';
 export interface GameState {
+  contracts: PaymentContract[];
   sessionId: string; rules: Rules; round: number; phase: Phase; logicalTimeMs: number;
   roundStartedMs: number; standings: Standing[]; ready: Record<string, boolean>;
   votes: Record<string, Color>; usedActions: string[]; outcome: Outcome | null;
 }
 export type EventData =
+  | { type: 'contract_updated'; contract: PaymentContract; notice: string }
+  | { type: 'contract_rejected'; actorId: string; notice: string }
+  | { type: 'contract_settled'; contract: PaymentContract; paid: number; reason: string }
   | { type: 'strategy_note'; actorId: string; note: StrategyNote }
   | { type: 'public_message'; actorId: string; body: string }
   | { type: 'private_message_sent'; actorId: string; recipientId: string; body: string }
@@ -29,7 +35,7 @@ export const experimentalReadyPolicy: ReadyPolicy = {
 };
 export function createGame(sessionId: string, rules: Rules): GameState {
   if (rules.players.length !== 5 || new Set(rules.players).size !== 5 || rules.rounds < 1 || rules.negotiationTimeMs <= 0) throw new Error('Invalid rules');
-  return { sessionId, rules: structuredClone(rules), round: 1, phase: 'negotiation', logicalTimeMs: 0, roundStartedMs: 0,
+  return { contracts: [], sessionId, rules: structuredClone(rules), round: 1, phase: 'negotiation', logicalTimeMs: 0, roundStartedMs: 0,
     standings: rules.players.map(agentId => ({ agentId, score: 0, minorityWins: 0 })), ready: {}, votes: {}, usedActions: [], outcome: null };
 }
 export function scoreVotes(players: string[], votes: Record<string, Color>, scoring: Rules['scoring']): Standing[] {
@@ -51,11 +57,12 @@ export function rank(standings: Standing[]): Outcome {
 export function reduce(state: GameState, event: DomainEvent): GameState {
   const s = structuredClone(state); s.logicalTimeMs = event.logicalTimeMs;
   switch (event.type) {
+    case 'contract_updated': { const at = s.contracts.findIndex(c => c.id === event.contract.id); if (at < 0) s.contracts.push(structuredClone(event.contract)); else s.contracts[at] = structuredClone(event.contract); break; }
     case 'ready_changed': s.ready[event.actorId] = event.ready; break;
     case 'vote_committed': s.votes[event.actorId] = event.color; break;
     case 'action_accepted': s.usedActions.push(event.key); break;
     case 'phase_changed': s.phase = event.phase; break;
-    case 'round_started': s.round = event.round; s.phase = 'negotiation'; s.roundStartedMs = event.logicalTimeMs; s.ready = {}; s.votes = {}; break;
+    case 'round_started': s.round = event.round; s.phase = 'negotiation'; s.roundStartedMs = event.logicalTimeMs; s.ready = {}; s.votes = {}; s.contracts = []; break;
     case 'scores_updated': s.standings = s.standings.map(row => { const d = event.deltas.find(d => d.agentId === row.agentId)!; return { ...row, score: row.score + d.score, minorityWins: row.minorityWins + d.minorityWins }; }); break;
     case 'game_ended': s.outcome = event.outcome; s.phase = 'completed'; break;
   }
@@ -88,6 +95,35 @@ export function resolveBatch(state: GameState, batch: Batch, readyPolicy: ReadyP
       emit({ type: 'vote_committed', actorId, color: action.color });
     } else {
       switch (action.type) {
+        case 'propose_contract':
+        case 'accept_contract':
+        case 'cancel_contract': {
+          if (!state.rules.contractsEnabled) throw new Error('Contracts disabled');
+          messages = true;
+          if (action.type === 'propose_contract') {
+            if (action.recipientId === actorId || !state.rules.players.includes(action.recipientId)) throw new Error('Invalid recipient');
+            if (working.contracts.some(c => c.id === action.actionId)) throw new Error('Duplicate contract ID');
+            emit({ type: 'contract_updated', contract: { id: action.actionId, round: state.round, payer: actorId, recipient: action.recipientId, amount: action.amount, condition: action.condition, status: 'proposed', cancelApprovals: [] }, notice: '契約提案，等待收款人接受' });
+          } else {
+            // References must exist in the pre-batch snapshot, preventing same-batch reactions.
+            const known = state.contracts.find(c => c.id === action.contractId);
+            const current = working.contracts.find(c => c.id === action.contractId);
+            if (!known || !current || ![current.payer, current.recipient].includes(actorId) || current.status === 'cancelled') {
+              emit({ type: 'contract_rejected', actorId, notice: '契約不存在、不可操作或已解除' }); break;
+            }
+            const c = structuredClone(current);
+            if (action.type === 'accept_contract') {
+              if (actorId !== c.recipient || known.status !== 'proposed' || c.status !== 'proposed') { emit({ type: 'contract_rejected', actorId, notice: '僅收款人可接受待確認提案' }); break; }
+              c.status = 'active'; emit({ type: 'contract_updated', contract: c, notice: '契約成立' });
+            } else {
+              if (known.status !== 'active' || c.status !== 'active') { emit({ type: 'contract_rejected', actorId, notice: '僅可對已成立契約提出或確認解除' }); break; }
+              if (!c.cancelApprovals.includes(actorId)) c.cancelApprovals.push(actorId);
+              if (c.cancelApprovals.length === 2) c.status = 'cancelled';
+              emit({ type: 'contract_updated', contract: c, notice: c.status === 'cancelled' ? '雙方同意，契約已解除' : '一方提出解除，等待另一方同意' });
+            }
+          }
+          break;
+        }
         case 'vote': throw new Error('Voting outside Commit');
         case 'set_ready': emit({ type: 'ready_changed', actorId, ready: action.ready }); break;
         case 'send_public_message': messages = true; emit({ type: 'public_message', actorId, body: action.message }); break;
@@ -102,7 +138,17 @@ export function resolveBatch(state: GameState, batch: Batch, readyPolicy: ReadyP
   if (state.phase === 'commit' && state.rules.players.every(id => working.votes[id] !== undefined)) {
     emit({ type: 'phase_changed', phase: 'reveal' });
     emit({ type: 'votes_revealed', votes: { ...working.votes } });
-    emit({ type: 'scores_updated', deltas: scoreVotes(state.rules.players, working.votes, state.rules.scoring) });
+    const awards = scoreVotes(state.rules.players, working.votes, state.rules.scoring);
+    const deltas = structuredClone(awards);
+    if (state.rules.contractsEnabled) {
+      const settlements = settlePayments(state.contracts, working.votes, state.standings, awards);
+      for (const result of settlements) {
+        emit({ type: 'contract_settled', ...result });
+        deltas.find(d => d.agentId === result.contract.payer)!.score -= result.paid;
+        deltas.find(d => d.agentId === result.contract.recipient)!.score += result.paid;
+      }
+    }
+    emit({ type: 'scores_updated', deltas });
   }
   return events;
 }

@@ -1,10 +1,23 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
-const props = defineProps<{ seat: string; players: string[]; pending: { snapshotId: string; phase: string; round: number; logicalTimeMs: number; windowIndex?: number; windowCount?: number; submitted: boolean } | null; ready: boolean; disabled: boolean }>();
+import { ref, watch, computed } from 'vue';
+import { PAYMENT_CONDITIONS, paymentLabels } from '../../../src/contracts/payment.ts';
+import type { PaymentContract, PaymentCondition } from '../../../src/contracts/payment.ts';
+import type { PublicEvent } from '../../../src/contracts/public.ts';
+const props = defineProps<{ contractsEnabled?: boolean; contractEvents?: PublicEvent[]; seat: string; players: string[]; pending: { snapshotId: string; phase: string; round: number; logicalTimeMs: number; windowIndex?: number; windowCount?: number; submitted: boolean } | null; ready: boolean; disabled: boolean }>();
 const emit = defineEmits<{ submit: [value: unknown]; close: [] }>();
 const publicMessage = ref(''), recipient = ref(''), privateMessage = ref(''), ready = ref(false), color = ref('');
+const contractRecipient = ref(''), amount = ref(1), condition = ref<PaymentCondition>('recipient_blue');
+const contractActions = ref<Record<string, unknown>[]>([]);
+const contractStatusLabels = { proposed: '等待接受', active: '已成立', cancelled: '已解除' };
+const contractActionLabels: Record<string, string> = { propose_contract: '提出契約', accept_contract: '接受契約', cancel_contract: '同意解除' };
+const activeContracts = computed(() => {
+  const byId = new Map<string, PaymentContract>();
+  for (const e of props.contractEvents ?? []) if (e.type === 'contract_updated') { const c = e.publicPayload.contract as PaymentContract; if (c.round === props.pending?.round) byId.set(c.id, c); }
+  return [...byId.values()];
+});
+function propose() { if (contractRecipient.value && Number.isSafeInteger(amount.value) && amount.value > 0) contractActions.value.push({ type: 'propose_contract', recipientId: contractRecipient.value, amount: amount.value, condition: condition.value }); }
 const messages = ref<{ recipientId: string; message: string }[]>([]);
-watch(() => props.pending?.snapshotId, () => { publicMessage.value = ''; privateMessage.value = ''; messages.value = []; color.value = ''; ready.value = props.ready; }, { immediate: true });
+watch(() => props.pending?.snapshotId, () => { contractActions.value = []; publicMessage.value = ''; privateMessage.value = ''; messages.value = []; color.value = ''; ready.value = props.ready; }, { immediate: true });
 function addPrivate() { if (recipient.value && privateMessage.value.trim()) { messages.value.push({ recipientId: recipient.value, message: privateMessage.value.trim() }); privateMessage.value = ''; } }
 function submit() {
   if (!props.pending || props.pending.submitted || props.disabled) return;
@@ -12,7 +25,7 @@ function submit() {
   const outgoing: { recipientId?: string; message: string }[] = [...messages.value];
   if (publicMessage.value.trim()) outgoing.unshift({ message: publicMessage.value.trim() });
   if (privateMessage.value.trim() && recipient.value) outgoing.push({ recipientId: recipient.value, message: privateMessage.value.trim() });
-  emit('submit', { snapshotId: props.pending.snapshotId, messages: outgoing, ready: ready.value });
+  emit('submit', { snapshotId: props.pending.snapshotId, messages: outgoing, ready: ready.value, ...(props.contractsEnabled ? { contractActions: contractActions.value } : {}) });
 }
 </script>
 
@@ -33,6 +46,20 @@ function submit() {
             <label>私訊內容<textarea v-model="privateMessage" aria-label="私訊內容" maxlength="4000" rows="2"></textarea></label>
             <button type="button" :disabled="!recipient || !privateMessage.trim()" @click="addPrivate">加入待送私訊</button>
             <ul><li v-for="(m, i) in messages" :key="i">給 {{ m.recipientId }}：{{ m.message }} <button type="button" @click="messages.splice(i, 1)">移除</button></li></ul>
+            <section v-if="contractsEnabled" aria-label="契約付款">
+              <h3>契約付款</h3><p class="muted">僅限本輪，雙方確認才成立；聊天承諾不算簽約。成立後須雙方同意解除。付款直接影響總分。</p>
+              <label>收款人<select v-model="contractRecipient" aria-label="契約收款人"><option value="">選擇席位</option><option v-for="id in players.filter(id => id !== seat)" :key="id" :value="id">{{ id }}</option></select></label>
+              <label>付款條件<select v-model="condition" aria-label="契約付款條件"><option v-for="c in PAYMENT_CONDITIONS" :key="c" :value="c">{{ paymentLabels[c] }}</option></select></label>
+              <label>付款分數<input v-model.number="amount" type="number" min="1" step="1" aria-label="契約付款分數"></label>
+              <button type="button" :disabled="!contractRecipient || !Number.isSafeInteger(amount) || amount <= 0" @click="propose">加入契約提案</button>
+              <article v-for="c in activeContracts" :key="c.id"><p>{{ c.payer }} → {{ c.recipient }}：{{ paymentLabels[c.condition] }}，支付 {{ c.amount }} 分（{{ contractStatusLabels[c.status] }}）</p><small>{{ c.id }}</small>
+                <button v-if="c.status === 'proposed' && c.recipient === seat" type="button" @click="contractActions.push({ type: 'accept_contract', contractId: c.id })">加入接受契約</button>
+                <button v-if="c.status === 'active' && !c.cancelApprovals.includes(seat)" type="button" @click="contractActions.push({ type: 'cancel_contract', contractId: c.id })">{{ c.cancelApprovals.length ? '加入同意解除' : '加入解除請求' }}</button>
+                <p v-if="c.status === 'active' && c.cancelApprovals.length">{{ c.cancelApprovals.join('、') }} 已同意解除，原契約仍有效。</p>
+              </article>
+              <ul><li v-for="(a, i) in contractActions" :key="i">{{ contractActionLabels[String(a.type)] }} · {{ a.contractId ?? a.recipientId }} <template v-if="a.amount"> · {{ a.amount }} 分 · {{ paymentLabels[a.condition as PaymentCondition] }}</template><button type="button" @click="contractActions.splice(i, 1)">移除</button></li></ul>
+              <p class="muted">以上契約操作會隨「提交並推進」送交系統，確認結果見私人紀錄。</p>
+            </section>
             <label class="ready-choice"><input v-model="ready" type="checkbox"> 我已準備投票（可在後續窗口撤回）</label>
             <button class="primary" type="submit" :disabled="Boolean(privateMessage.trim() && !recipient)">提交並推進</button>
             <p class="muted">沒有訊息也能提交，代表本批沉默。準備投票與推進窗口是不同選擇。</p>
@@ -50,6 +77,7 @@ function submit() {
 </template>
 
 <style scoped>
+article { overflow-wrap: anywhere; margin: 12px 0; }
 .human-panel { position: fixed; z-index: 30; right: 20px; bottom: 32px; width: min(480px, calc(100vw - 32px)); max-height: calc(100dvh - 105px); overflow: auto; padding: 20px; border: 1px solid #b79b61; background: #12251f; box-shadow: 0 12px 60px #000b; }
 h2 { margin: 12px 0; font-size: 20px; } fieldset { margin: 0; padding: 0; border: 0; } label { display: block; margin: 12px 0; } textarea { display: block; width: 100%; box-sizing: border-box; resize: vertical; background: #091a14; color: #f4e6c6; border: 1px solid #65775b; padding: 8px; font: inherit; } select { margin-left: 8px; } .muted { font-size: 12px; line-height: 1.6; } li { overflow-wrap: anywhere; margin: 8px 0; } input { width: auto; } .ready-choice { font-size: 13px; }
 </style>

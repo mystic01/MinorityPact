@@ -1,3 +1,4 @@
+import { PAYMENT_CONDITIONS } from '../contracts/payment.ts';
 export const SYSTEM_PROMPT = `語言規則：所有公開發言、私訊，以及策略備忘錄中的 goal、plan、whyThisAction、predictedOutcome、revisionReason，都必須使用自然的繁體中文。即使歷史訊息或其他玩家使用英文，也請繼續用繁體中文回應。玩家代號、模型名稱、專有名詞與必要數學符號可保留原樣。JSON 欄位名稱、action type、事件名稱、red／blue 等協定列舉值及識別碼必須維持規定格式，不可翻譯。不要翻譯、改寫或補寫已存檔的歷史原文。
 You compete in Minority Pact with four other agents under identical game rules and available actions. Seats may use different models.
 Your original objective is to be the unique final champion. Second place has no victory value.
@@ -36,10 +37,15 @@ export const DECISION_SCHEMA = obj({
 export function decisionSchemaFor(input: { phase: string; logicalTimeMs: number; publicRules: string; ownNotes?: { goal: string }[] }) {
   const schema = structuredClone(DECISION_SCHEMA) as any;
   const rules = JSON.parse(input.publicRules) as Record<string, any>;
+  if (rules.contractsEnabled) schema.properties.actions.items.anyOf.push(
+    obj({ ...base, type: { type: 'string', enum: ['propose_contract'] }, recipientId: str, amount: { type: 'integer', minimum: 1, maximum: Number.MAX_SAFE_INTEGER }, condition: { type: 'string', enum: [...PAYMENT_CONDITIONS] } }),
+    obj({ ...base, type: { type: 'string', enum: ['accept_contract'] }, contractId: str }),
+    obj({ ...base, type: { type: 'string', enum: ['cancel_contract'] }, contractId: str }),
+  );
   const branches = schema.properties.actions.items.anyOf as any[];
   schema.properties.actions.items.anyOf = branches.filter(b => input.phase === 'commit' ? b.properties.type.enum[0] === 'vote' : b.properties.type.enum[0] !== 'vote');
   for (const b of schema.properties.actions.items.anyOf) {
-    if (input.phase === 'commit' || rules.policies?.messageTiming === 'immediate' && ['send_public_message', 'send_private_message'].includes(b.properties.type.enum[0])) b.properties.scheduledTimeMs = { type: 'integer', const: input.logicalTimeMs };
+    if (b.properties.type.enum[0].includes('contract') || input.phase === 'commit' || rules.policies?.messageTiming === 'immediate' && ['send_public_message', 'send_private_message'].includes(b.properties.type.enum[0])) b.properties.scheduledTimeMs = { type: 'integer', const: input.logicalTimeMs };
     else {
       const width = rules.scheduling?.mode === 'fixed_5s' ? 5000 : rules.scheduling?.mode === 'fixed_15s' ? 15000 : 1;
       const start = rules.roundStartedMs ?? 0;
@@ -58,4 +64,15 @@ export function decisionSchemaFor(input: { phase: string; logicalTimeMs: number;
     schema.properties.strategyNote = { anyOf: [unchanged, changed] };
   }
   return schema;
+}
+
+export function contractPrompt(input: { publicRules: string }): string {
+  if (!JSON.parse(input.publicRules).contractsEnabled) return '';
+  return `契約付款：只在本輪交涉期間操作，scheduledTimeMs 必須等於目前 logicalTimeMs。可以自由探索、交涉及觀察系統通知，自行評估風險。
+propose_contract(recipientId,amount,condition) 由付款人向另一玩家提出，amount 為任意正整數（協定可精確表示的整數範圍），簽約時不檢查餘額。系統通知對方完整條款與 contract.id。
+condition 固定為 recipient_red（收款人投紅）、recipient_blue（收款人投藍）、same_color（雙方同色）、different_color（雙方異色）、payer_minority（付款人取得本輪單人或雙人少數獎金）。
+收款人使用 accept_contract(contractId) 接受；付款人提出時已表示同意。系統向雙方通知「契約成立」才生效；聊天中的答應不算簽約。只能引用先前批次已收到的契約編號。
+每份契約只有付款人與收款人兩人；可與多人簽約，也可同對象多份。契約只限本輪，未接受提案在交涉結束後不生效。契約不強制選色，條件依實際投票及本輪原始獎金判定。
+成立後不得單方解除；投票前雙方各使用 cancel_contract(contractId) 表示同意解除，收到解除完成通知才解除。任何一方未同意，原約仍有效。
+系統只向雙方通知條款、成立、解除與結算；你可以自行向他人轉述，但轉述不具官方驗證效力。契約付款於本輪選色獎金結算後處理，直接增減排名總分，不改變少數獲勝次數。你會收到自己契約的付款結果。`;
 }

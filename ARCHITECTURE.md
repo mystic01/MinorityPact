@@ -180,3 +180,7 @@ status：created → running ↔ paused / paused_error → completed 或 aborted
 ## 手動檔案模式（2026-11-09）
 
 SessionConfig.decisionMode=manual_file 由網頁選擇並保存。ManualFileController 沿用 SYSTEM_PROMPT、授權快照、decisionSchemaFor 與 parseDecision。Coordinator 回傳 waiting_manual，保留部分結果，同批未齊不結算。後端每秒檢查，內容連續兩次相同才讀取；前端輪詢受 token 保護的 manual 進度端點，不傳私有內容。交換檔在 data/manual/對局ID，archive 保存歷史。此模式不建立 OpenRouterController；舊 provider 欄位僅保留相容性。
+
+## 雙人契約付款（2026-11-10）
+
+contractsEnabled 控制新局功能，歷史缺省為關閉。contracts/payment.ts 為共用條件及狀態，domain/payments.ts 封裝只供伺服器使用的結算規則，engine 以契約事件還原狀態、同步批次結算總分。projection 僅向雙方提供相關事件，coordinator 於契約通知後安排下一窗口喚醒。API 與手動提示僅附公開操作規則及動態 schema，不附內部支付門檻；真人介面透過既有授權提交及玩家事件提供同樣行動。結算與契約事件沿用 SQLite append-only 交易與完成後全知重播，不新增資料表。管理者說明見 docs/CONTRACTS_INTERNAL.md。

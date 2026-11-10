@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import type { AgentController, DecisionInput, DecisionResult } from '../contracts/decision.ts';
 import { parseDecision } from '../contracts/schema.ts';
-import { SYSTEM_PROMPT, decisionSchemaFor } from './prompt.ts';
+import { SYSTEM_PROMPT, decisionSchemaFor, contractPrompt } from './prompt.ts';
 import { providerInput } from './provider-input.ts';
 
 export class ManualPending extends Error { readonly manualPending = true; }
@@ -27,6 +27,7 @@ ${input.ownNotes.length ? `若目標不變，goal 必須逐字使用 ${JSON.stri
 
 ## 完整遊戲與行動規則
 ${SYSTEM_PROMPT}
+${contractPrompt(input)}
 
 ## 本次修正要求
 ${feedback || '無。請直接依快照決策。'}

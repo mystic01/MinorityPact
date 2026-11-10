@@ -1,10 +1,13 @@
+import { PAYMENT_CONDITIONS } from './payment.ts';
 import type { Action, DecisionResult } from './decision.ts';
 import { array, integer, keys, object, oneOf, text } from './validation.ts';
 export function parseAction(value: unknown): Action {
   const v = object(value);
-  const type = oneOf(v.type, ['send_public_message', 'send_private_message', 'set_ready', 'vote']);
+  const type = oneOf(v.type, ['send_public_message', 'send_private_message', 'set_ready', 'vote', 'propose_contract', 'accept_contract', 'cancel_contract']);
   const base = { actionId: text(v.actionId), scheduledTimeMs: integer(v.scheduledTimeMs) };
   const fields = ['type', 'actionId', 'scheduledTimeMs'];
+  if (type === 'propose_contract') { keys(v, [...fields, 'recipientId', 'amount', 'condition']); return { ...base, type, recipientId: text(v.recipientId), amount: integer(v.amount, 1), condition: oneOf(v.condition, PAYMENT_CONDITIONS) }; }
+  if (type === 'accept_contract' || type === 'cancel_contract') { keys(v, [...fields, 'contractId']); return { ...base, type, contractId: text(v.contractId) }; }
   if (type === 'vote') { keys(v, [...fields, 'color']); return { ...base, type, color: oneOf(v.color, ['red', 'blue']) }; }
   if (type === 'set_ready') {
     keys(v, [...fields, 'ready']);

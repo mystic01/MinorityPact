@@ -8,6 +8,13 @@ export type Viewer = { kind: 'spectator' } | { kind: 'agent'; agentId: string } 
 export function projectEvent(e: StoredEvent, viewer: Viewer): PublicEvent | null {
   const d = e.data; let payload: Record<string, unknown>;
   switch (d.type) {
+    case 'contract_updated':
+    case 'contract_settled':
+      if (viewer.kind !== 'omniscient' && !(viewer.kind === 'agent' && [d.contract.payer, d.contract.recipient].includes(viewer.agentId))) return null;
+      payload = structuredClone(d) as unknown as Record<string, unknown>; break;
+    case 'contract_rejected':
+      if (viewer.kind !== 'omniscient' && !(viewer.kind === 'agent' && d.actorId === viewer.agentId)) return null;
+      payload = { notice: d.notice, actorId: d.actorId }; break;
     case 'public_message': payload = { sender: d.actorId, body: d.body }; break;
     case 'private_message_sent':
       payload = { sender: d.actorId, recipient: d.recipientId };
@@ -33,7 +40,7 @@ export function projectEvent(e: StoredEvent, viewer: Viewer): PublicEvent | null
   return { eventId: e.eventId, batchId: e.batchId, commitSeq: e.commitSeq, logicalTimeMs: e.logicalTimeMs, type: d.type, publicPayload: payload };
 }
 export function publicView(state: GameState, config: SessionConfig): PublicView {
-  return { sessionId: state.sessionId, round: state.round, phase: state.phase, logicalTimeMs: state.logicalTimeMs,
+  return { ...(config.contractsEnabled ? { contractsEnabled: true } : {}), sessionId: state.sessionId, round: state.round, phase: state.phase, logicalTimeMs: state.logicalTimeMs,
     rounds: config.rounds, negotiationTimeMs: config.negotiationTimeMs, roundStartedMs: state.roundStartedMs,
     messageTiming: config.policies.messageTiming ?? 'scheduled',
     outcome: structuredClone(state.outcome),
