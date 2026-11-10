@@ -5,6 +5,7 @@ export type Phase = 'negotiation' | 'commit' | 'reveal' | 'completed';
 export interface Standing { agentId: AgentId; score: number; minorityWins: number }
 export type Outcome = { kind: 'winner'; agentId: AgentId } | { kind: 'draw'; agentIds: AgentId[] };
 export interface PublicView {
+  scoring?: { solo: number; pair: number; majority: number };
   contractsEnabled?: boolean;
   sessionId: string; round: number; phase: Phase; logicalTimeMs: number;
   standings: Standing[]; model: { provider: 'openrouter'; model: string; displayName?: string };

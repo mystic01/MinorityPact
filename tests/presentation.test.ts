@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { expressionFor, publicSpeech, groupBatches } from '../web/src/presentation.ts';
+import { expressionFor, publicSpeech, groupBatches, roundResults } from '../web/src/presentation.ts';
 import type { PublicEvent } from '../src/contracts/public.ts';
 const event = (type: string, publicPayload: Record<string, unknown>, logicalTimeMs = 0): PublicEvent => ({ type, publicPayload, logicalTimeMs, eventId: `${type}:${logicalTimeMs}`, batchId: 'b', commitSeq: 1 });
 
@@ -29,4 +29,31 @@ test('reveal expressions reflect the latest public score delta, not total rank o
   assert.equal(expressionFor('A', undefined, 'reveal', events), 'surprised');
   assert.equal(expressionFor('B', undefined, 'completed', events), 'smile');
   assert.equal(expressionFor('C', undefined, 'reveal', events), 'neutral');
+});
+
+test('round results persist after next round, accumulate legacy payment deltas and ignore secret votes', () => {
+  const events = [
+    event('vote_committed', { actorId: 'A', color: 'blue' }),
+    event('votes_revealed', { votes: { A: 'red', B: 'blue', C: 'red', D: 'blue', E: 'blue' } }),
+    event('scores_updated', { deltas: [{ agentId: 'A', score: 2 }, { agentId: 'C', score: 2 }] }),
+    event('scores_updated', { deltas: [{ agentId: 'A', score: -2 }, { agentId: 'B', score: 2 }] }),
+    event('round_started', { round: 2 }),
+    event('vote_committed', { actorId: 'A', color: 'blue' }),
+  ];
+  const results = roundResults(events);
+  assert.equal(results.length, 1); assert.equal(results[0]!.round, 1);
+  assert.deepEqual(results[0]!.minority, ['A', 'C']);
+  assert.deepEqual(results[0]!.net, { A: 0, B: 2, C: 2 });
+  assert.equal(results[0]!.votes.A, 'red');
+});
+
+test('history follows replay prefix and does not attribute old-round deltas to a new round', () => {
+  const first = event('votes_revealed', { votes: { A: 'red', B: 'red', C: 'red', D: 'red', E: 'red' } });
+  const second = event('votes_revealed', { votes: { A: 'blue', B: 'red', C: 'red', D: 'red', E: 'red' } });
+  const events = [first, event('round_started', { round: 2 }), event('scores_updated', { deltas: [{ agentId: 'A', score: 99 }] }), second];
+  assert.deepEqual(roundResults(events.slice(0, 1))[0]!.minority, []);
+  assert.equal(roundResults(events.slice(0, 1))[0]!.settled, false);
+  assert.deepEqual(roundResults(events).map(r => r.round), [1, 2]);
+  assert.deepEqual(roundResults(events)[1]!.minority, ['A']);
+  assert.deepEqual(roundResults(events)[0]!.net, {});
 });

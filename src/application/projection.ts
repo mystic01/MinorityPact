@@ -40,7 +40,7 @@ export function projectEvent(e: StoredEvent, viewer: Viewer): PublicEvent | null
   return { eventId: e.eventId, batchId: e.batchId, commitSeq: e.commitSeq, logicalTimeMs: e.logicalTimeMs, type: d.type, publicPayload: payload };
 }
 export function publicView(state: GameState, config: SessionConfig): PublicView {
-  return { ...(config.contractsEnabled ? { contractsEnabled: true } : {}), sessionId: state.sessionId, round: state.round, phase: state.phase, logicalTimeMs: state.logicalTimeMs,
+  return { scoring: structuredClone(config.scoring), ...(config.contractsEnabled ? { contractsEnabled: true } : {}), sessionId: state.sessionId, round: state.round, phase: state.phase, logicalTimeMs: state.logicalTimeMs,
     rounds: config.rounds, negotiationTimeMs: config.negotiationTimeMs, roundStartedMs: state.roundStartedMs,
     messageTiming: config.policies.messageTiming ?? 'scheduled',
     outcome: structuredClone(state.outcome),

@@ -127,3 +127,12 @@ T1/T2 程式已實作；規則測試通過，**型別檢查尚未驗證成功，
 - 驗證：npm.cmd run typecheck、npm.cmd run web:check、npm.cmd run build 通過；npm.cmd test 126/126 通過（新增 8 項契約測試，含門檻、隱私、通知喚醒、磁碟重開與完整五回合 scripted 對局）。
 - Chrome QA：npm.cmd run test:browser、npm.cmd run test:manual-browser、npm.cmd run test:contracts-browser 全部通過；新測試包含真人提案、腳本 AI 接受、私人通知、雙方解除與公開觀戰不洩漏契約。截圖 .npm-cache/browser-qa/contracts.png 為忽略的本地產物。
 - 全部驗證離線，沒有付費請求，沒有續接真正多模型 smoke。腳本測試不代表真實 AI 已能自主發現隱藏機制。
+
+## 2026-11-10 投票結果常駐與歷史表
+
+- 玩家席位以本輪待投／未揭曉文字取代鎖頭，另列上輪選色與回合；新回合不再清空過往結果。
+- 新增 RoundResults 常駐結果區，顯示紅藍人數、少數方、最近三輪與展開全部，逐席區分原始選色獎金及含契約付款的分數淨增減。公開事件描述補上各席紅藍票色。
+- publicView 提供本局凍結的計分設定，前端依實際票型計算原始獎金；相同 helper 可處理舊局分開記錄的多次 scores_updated。只使用 votes_revealed，不讀私有 vote_committed 或契約內容，重播回到開局不顯示未來結果。
+- 驗證：npm.cmd run typecheck、npm.cmd run web:check、npm.cmd run build 通過；npm.cmd test 128/128 通過。
+- npm.cmd run test:browser 最終通過，新增結果表三輪／全局切換、下一回合上輪常駐、本輪保密與重播清除未來結果的檢查；既有桌面／手機布局、秘密資訊與真人流程維持通過。初次 QA 仍檢查舊鎖頭 SVG，已改為檢查新的未揭曉文字標籤後通過。
+- 已檢視本地忽略截圖 .npm-cache/browser-qa/desktop.png、mobile.png。全部使用離線腳本代理，無付費 API，未續接真正多模型 smoke。

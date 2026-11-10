@@ -5,7 +5,7 @@ import type { Expression } from '../presentation.ts';
 
 // The seat accepts a participant label independently of its portrait or controller.
 // A future human controller can use this presentation without changing the stage.
-const props = defineProps<{ standing: Standing; portrait: string; participantLabel: string; expression: Expression; speaking: boolean; vote?: string; reveal: boolean }>();
+const props = defineProps<{ standing: Standing; portrait: string; participantLabel: string; expression: Expression; speaking: boolean; vote?: string; reveal: boolean; phase?: string; previousVote?: string; previousRound?: number }>();
 const broken = ref(false);
 const source = computed(() => `/avatars/${props.portrait}/${props.expression}.png`);
 watch(source, () => { broken.value = false; });
@@ -22,8 +22,18 @@ watch(source, () => { broken.value = false; });
       <div class="identity"><b class="seat-letter">{{ standing.agentId }}</b><span class="participant-label" :title="participantLabel">{{ participantLabel }}</span></div>
       <div class="seat-score"><span>得分 <strong>{{ standing.score }}</strong></span><small>少數勝 {{ standing.minorityWins }}</small></div>
     </div>
-    <div class="choice-token" :class="reveal && vote ? vote : ''" :aria-label="reveal && vote ? `本輪已揭曉：${vote === 'red' ? '紅色' : '藍色'}` : '選色尚未揭曉'">
-      <span v-if="reveal && vote">{{ vote === 'red' ? '紅' : '藍' }}</span><svg v-else viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="6" y="10" width="12" height="10" rx="2"/><path d="M9 10V7a3 3 0 016 0v3M12 14v3"/></svg>
+    <div class="choice-display">
+      <div class="choice-token" :class="reveal && vote ? vote : ''" :aria-label="reveal && vote ? `本輪已揭曉：${vote === 'red' ? '紅色' : '藍色'}` : '本輪選色尚未揭曉，不表示已提交'">
+        <span v-if="reveal && vote">{{ vote === 'red' ? '紅' : '藍' }}</span><span v-else class="sealed-label">{{ phase === 'commit' ? '未揭曉' : '本輪待投' }}</span>
+      </div>
+      <small v-if="previousVote" class="previous-choice" :class="previousVote">上輪 R{{ previousRound }}：{{ previousVote === 'red' ? '紅' : '藍' }}</small>
     </div>
   </article>
 </template>
+
+<style scoped>
+.choice-display { display: flex; justify-content: center; align-items: center; gap: 5px; min-width: 0; }
+.choice-display .choice-token { flex: 0 0 auto; width: auto; min-width: 36px; padding: 0 4px; }
+.sealed-label { font-size: 9px; white-space: nowrap; } .previous-choice { font-size: 9px; white-space: nowrap; }
+.previous-choice.red { color: #ffaaaa; } .previous-choice.blue { color: #a0d0ff; }
+</style>

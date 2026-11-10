@@ -184,3 +184,7 @@ SessionConfig.decisionMode=manual_file 由網頁選擇並保存。ManualFileCont
 ## 雙人契約付款（2026-11-10）
 
 contractsEnabled 控制新局功能，歷史缺省為關閉。contracts/payment.ts 為共用條件及狀態，domain/payments.ts 封裝只供伺服器使用的結算規則，engine 以契約事件還原狀態、同步批次結算總分。projection 僅向雙方提供相關事件，coordinator 於契約通知後安排下一窗口喚醒。API 與手動提示僅附公開操作規則及動態 schema，不附內部支付門檻；真人介面透過既有授權提交及玩家事件提供同樣行動。結算與契約事件沿用 SQLite append-only 交易與完成後全知重播，不新增資料表。管理者說明見 docs/CONTRACTS_INTERNAL.md。
+
+## 投票歷史展示（2026-11-10）
+
+web/src/presentation.ts 的 roundResults 只從公開揭曉事件、回合開始與分數增量重建結果，PlayerSeat 分列本輪狀態與上一回合已公開選色。RoundResults 元件位於既有對話側欄，內部滾動以保留牌桌與操作區。publicView.scoring 取自保存的本局設定，用於區分原始選色獎金與契約後淨增減；不向前端新增私人契約資料。
