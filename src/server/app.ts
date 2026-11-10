@@ -24,7 +24,7 @@ export function createApp(options: AppOptions) {
   }();
   for (const id of store.listSessions()) {
     const status = store.getStatus(id) as Status;
-    states.set(id, ['running', 'advancing', 'paused', 'waiting_manual'].includes(status) ? 'paused_error' : status);
+    states.set(id, (['running', 'advancing', 'paused', 'waiting_manual'].includes(status) || status === 'waiting_human' && store.getConfig(id).decisionMode === 'manual_file') ? 'paused_error' : status);
   }
   const manualStates = new Map<string, Record<string, string>>();
   const manualDirectory = (id: string) => resolve(options.manualRoot ?? 'data/manual', id);
@@ -49,7 +49,7 @@ export function createApp(options: AppOptions) {
     const manual = config.decisionMode === 'manual_file';
     if (!manual && !options.controllers && !options.apiKey) throw new Error('Missing key');
     if (manual) manualStates.set(id, {});
-    const controllers = manual ? Object.fromEntries(config.players.map(agent => [agent, new ManualFileController(manualDirectory(id), (seat, status) => { manualStates.get(id)![seat] = status; }, true)])) : options.controllers?.(config, id) ?? Object.fromEntries(config.players.filter(agent => agent !== config.humanSeat).map(agent => [agent, new OpenRouterController(modelForSeat(config, agent, typeof options.config.llm.parameters.max_tokens === 'number' ? options.config.llm.parameters.max_tokens : undefined), options.apiKey!, (snapshot, record) => store.recordAudit(id, snapshot, record))]));
+    const controllers = manual ? Object.fromEntries(config.players.filter(agent => agent !== config.humanSeat).map(agent => [agent, new ManualFileController(manualDirectory(id), (seat, status) => { manualStates.get(id)![seat] = status; }, true)])) : options.controllers?.(config, id) ?? Object.fromEntries(config.players.filter(agent => agent !== config.humanSeat).map(agent => [agent, new OpenRouterController(modelForSeat(config, agent, typeof options.config.llm.parameters.max_tokens === 'number' ? options.config.llm.parameters.max_tokens : undefined), options.apiKey!, (snapshot, record) => store.recordAudit(id, snapshot, record))]));
     active = id; states.set(id, 'running');
     const c = new DecisionCoordinator(store, id, controllers);
     void (async () => {
@@ -136,6 +136,7 @@ export function createApp(options: AppOptions) {
           const cp = await store.loadCheckpoint(id);
           return json(res, 200, { enabled: true, directory: manualDirectory(id), players: config.players.map(seat => {
             const p = cp?.pendingDecisions.find(p => p.snapshot.input.agentId === seat);
+            if (seat === config.humanSeat) return { seat, file: null, status: p ? p.result || store.humanSubmission(id, p.snapshot.snapshotId) ? '你已提交' : '等待你提交' : '本批無需提交', round: p?.snapshot.input.round, phase: p?.snapshot.input.phase };
             return { seat, file: `player-${seat}.md`, status: p?.result ? '已接受' : p ? manualStates.get(id)?.[seat] ?? '等待回覆' : '本批無需回覆', round: p?.snapshot.input.round, phase: p?.snapshot.input.phase };
           }) });
         }

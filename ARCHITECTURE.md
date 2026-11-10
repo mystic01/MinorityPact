@@ -188,3 +188,7 @@ contractsEnabled 控制新局功能，歷史缺省為關閉。contracts/payment.
 ## 投票歷史展示（2026-11-10）
 
 web/src/presentation.ts 的 roundResults 只從公開揭曉事件、回合開始與分數增量重建結果，PlayerSeat 分列本輪狀態與上一回合已公開選色。RoundResults 元件位於既有對話側欄，內部滾動以保留牌桌與操作區。publicView.scoring 取自保存的本局設定，用於區分原始選色獎金與契約後淨增減；不向前端新增私人契約資料。
+
+## 手動 AI 與真人混合（2026-11-10）
+
+解除 manual_file 與 humanSeat 的互斥設定，仍沿用真人 fixed_5s／immediate 驗證。server 僅為非真人席位建立 ManualFileController，真人仍使用 human-submit、human_submissions 與既有授權 player 端點。manual 進度端點真人 file=null，從鎖定提交記錄顯示狀態。Coordinator 原有部分結果保存及雙方收齊才結算的流程共用，不建立真人 Markdown；waiting_human 的手動局在重啟後標示可續接，避免介面停在等待卻無法繼續。

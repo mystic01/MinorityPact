@@ -53,7 +53,6 @@ export function parseConfig(value: unknown): SessionConfig {
   if (v.humanSeat !== undefined && (!players.includes(text(v.humanSeat)) || t.mode !== 'fixed_5s' || p.messageTiming !== 'immediate')) throw new Error('Human mode requires a valid seat, fixed_5s and immediate messages');
   if (v.contractsEnabled !== undefined && typeof v.contractsEnabled !== 'boolean') throw new Error('Invalid contracts setting');
   if (v.decisionMode !== undefined) oneOf(v.decisionMode, ['manual_file']);
-  if (v.decisionMode === 'manual_file' && v.humanSeat) throw new Error('Manual files require all AI seats');
   return {
     ...(v.contractsEnabled === undefined ? {} : { contractsEnabled: v.contractsEnabled as boolean }),
     ...(v.decisionMode === 'manual_file' ? { decisionMode: 'manual_file' as const } : {}),

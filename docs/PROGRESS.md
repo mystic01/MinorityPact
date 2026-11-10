@@ -143,3 +143,13 @@ T1/T2 程式已實作；規則測試通過，**型別檢查尚未驗證成功，
 - 結果分頁保留三輪／全部切換、紅藍票型、獎金與淨增減，改用完整內容區捲動。上輪選色標記與公開資訊保護維持。
 - 驗證：npm.cmd run typecheck、npm.cmd run web:check、npm.cmd run build 通過；npm.cmd test 128/128 通過；npm.cmd run test:browser 通過，涵蓋預設隱藏、結果分頁切換、切回公開對話恢復事件區、歷史結果、重播與手機／桌面布局。
 - 全部使用離線腳本代理，沒有付費 API 或續接真正多模型 smoke。
+
+## 2026-11-10 手動 AI 與真人混合
+
+- 依確認方針，手動模式保留真人席位選擇；真人沿用網頁發言、私訊、契約、準備投票與秘密選色，不建立該席 Markdown。非真人四席沿用檔案 polling。
+- 進度端點以 file=null 表示真人，區分「等待你提交／你已提交」；立繪保留「你」標示。AI 與真人先後提交皆可，先提交鎖定且同批不提前公開，等所需回覆全部有效才結算。
+- 新增手動 waiting_human 局重啟後可明確續接的狀態處理，維持原真人五秒邏輯窗口與 immediate 訊息驗證。舊局不改席位。
+- 更新 docs/MANUAL_MODE.md，說明四 AI 檔案＋網頁真人的操作、狀態及重啟流程。
+- 驗證：npm.cmd run typecheck、npm.cmd run web:check、npm.cmd run build 通過；npm.cmd test 129/129 通過。新增 manual-human.test.ts 驗證無真人檔案、真人先交、部分 AI 接受、提交不可改寫、同批快照不洩漏、遊戲時間凍結、磁碟關閉重開、AI 先投票保密與統一揭曉；其等待真人時重啟的擴充案例另行定向測試通過。
+- Chrome：test:manual-browser 通過，涵蓋五 AI 舊流程與一真人四 AI、真人網頁提交／刷新、四份檔案、AI 先投票與下一回合接續。test:browser、test:contracts-browser 通過。已檢視 .npm-cache/browser-qa/manual-human.png（忽略產物）。測試切換前一局中止後等待其一秒輪詢循環退出，再開下一局。
+- 全部離線驗證，無 API key、無付費測試，未續接真正多模型 smoke，不代表真實 AI 策略或十回合驗收。
