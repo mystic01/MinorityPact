@@ -136,3 +136,10 @@ T1/T2 程式已實作；規則測試通過，**型別檢查尚未驗證成功，
 - 驗證：npm.cmd run typecheck、npm.cmd run web:check、npm.cmd run build 通過；npm.cmd test 128/128 通過。
 - npm.cmd run test:browser 最終通過，新增結果表三輪／全局切換、下一回合上輪常駐、本輪保密與重播清除未來結果的檢查；既有桌面／手機布局、秘密資訊與真人流程維持通過。初次 QA 仍檢查舊鎖頭 SVG，已改為檢查新的未揭曉文字標籤後通過。
 - 已檢視本地忽略截圖 .npm-cache/browser-qa/desktop.png、mobile.png。全部使用離線腳本代理，無付費 API，未續接真正多模型 smoke。
+
+## 2026-11-10 投票結果獨立分頁
+
+- 依使用者要求，將結果區移到「公開對話」旁的「投票結果」分頁。預設全部紀錄不占用聊天內容高度，切換聊天隱藏結果並完整恢復事件區；選擇其他對局重設到全部紀錄。
+- 結果分頁保留三輪／全部切換、紅藍票型、獎金與淨增減，改用完整內容區捲動。上輪選色標記與公開資訊保護維持。
+- 驗證：npm.cmd run typecheck、npm.cmd run web:check、npm.cmd run build 通過；npm.cmd test 128/128 通過；npm.cmd run test:browser 通過，涵蓋預設隱藏、結果分頁切換、切回公開對話恢復事件區、歷史結果、重播與手機／桌面布局。
+- 全部使用離線腳本代理，沒有付費 API 或續接真正多模型 smoke。

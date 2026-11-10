@@ -555,3 +555,5 @@ label input {
 .manual-players { display: flex; flex-wrap: wrap; gap: 16px; }
 .manual-players > div { display: grid; gap: 5px; flex: 1 1 150px; }
 body:has(.manual-panel) { overflow: auto; }
+
+.results-pane .round-results { border-bottom: 0; padding: 4px 0; }

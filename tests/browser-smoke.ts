@@ -101,11 +101,18 @@ try {
   assert.equal(await page.locator('.choice-token.blue').count(), 4);
   assert.equal(await page.locator('.player-seat.speaking').count(), 0);
   const resultPanel = page.getByRole('region', { name: '歷史投票結果' });
+  assert.equal(await resultPanel.isVisible(), false, 'results do not occupy the default chat panel');
+  await page.getByRole('button', { name: '投票結果', exact: true }).click();
+  assert.ok(await resultPanel.isVisible());
   assert.equal(await resultPanel.locator('tbody tr').count(), 3);
   assert.equal(await resultPanel.locator('[data-result-round="5"]').count(), 1);
   await resultPanel.getByRole('button', { name: '查看全部 5 輪' }).click();
   assert.equal(await resultPanel.locator('tbody tr').count(), 5);
   await resultPanel.getByRole('button', { name: '收起，只看最近三輪' }).click();
+  await page.getByRole('button', { name: '公開對話', exact: true }).click();
+  assert.equal(await resultPanel.isVisible(), false);
+  assert.ok(await page.getByLabel('對局事件紀錄').isVisible());
+  await page.getByRole('button', { name: '全部紀錄', exact: true }).click();
   mkdirSync('.npm-cache/browser-qa', { recursive: true });
   await page.screenshot({ path: '.npm-cache/browser-qa/desktop.png', fullPage: true });
   for (const width of [1920, 1100, 768, 320]) {
@@ -115,7 +122,9 @@ try {
   }
   await page.setViewportSize({ width: 1440, height: 1100 });
   await page.getByRole('button', { name: '終局重播 ↗' }).click();
+  await page.getByRole('button', { name: '投票結果', exact: true }).click();
   assert.equal(await resultPanel.locator('tbody tr').count(), 0, 'seeking to start clears future results');
+  await page.getByRole('button', { name: '全部紀錄', exact: true }).click();
   await page.setViewportSize({ width: 1366, height: 768 });
   await assertViewportFit();
   await page.getByLabel('解鎖私訊與策略').check();
@@ -169,9 +178,12 @@ try {
   await page.getByRole('button', { name: '提交並推進', exact: true }).waitFor();
   await page.waitForFunction(() => document.querySelectorAll('.previous-choice').length === 5);
   assert.equal(await page.locator('.choice-token.red,.choice-token.blue').count(), 0, 'new round choices remain sealed');
+  await page.getByRole('button', { name: '收起', exact: true }).click();
+  await page.getByRole('button', { name: '投票結果', exact: true }).click();
   assert.equal(await resultPanel.locator('[data-result-round="1"]').count(), 1, 'last round stays visible after advancing');
   assert.ok((await resultPanel.innerText()).includes('少數方'));
-  await page.getByRole('button', { name: '收起', exact: true }).click();
+  await page.getByRole('button', { name: '公開對話', exact: true }).click();
+  assert.equal(await resultPanel.isVisible(), false);
   await page.getByRole('button', { name: '中止', exact: true }).click();
   assert.deepEqual(errors, []);
   assert.deepEqual(failedAssets, []);

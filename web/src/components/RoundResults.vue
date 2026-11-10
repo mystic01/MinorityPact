@@ -32,9 +32,9 @@ function award(r: RoundResult, id: string) {
 .round-results { flex: 0 0 auto; min-height: 0; padding: 10px 18px; border-bottom: 1px solid #b79b6140; background: #0c1d17; }
 h3 { margin: 0; font-size: 15px; } h3 small { font-size: 10px; margin-left: 8px; color: #d1c5aa; font-weight: normal; }
 .result-summary { display: flex; gap: 16px; margin: 8px 0; font-size: 12px; flex-wrap: wrap; }
-.results-scroll { max-height: 190px; overflow: auto; } table { width: 100%; border-collapse: collapse; font-size: 11px; text-align: center; }
+.results-scroll { overflow-x: auto; } table { width: 100%; border-collapse: collapse; font-size: 11px; text-align: center; }
 caption { text-align: left; font-size: 10px; padding-bottom: 5px; color: #d1c5aa; } th, td { padding: 5px 3px; border-bottom: 1px solid #b79b6120; } td small { display: block; font-size: 9px; line-height: 1.4; }
 .red { color: #ff9393; } .blue { color: #91c8ff; } .minority { background: #b79b6118; } .minority b::after { content: ' ★'; font-size: 8px; color: #e8cf92; }
 .result-note, .result-empty { margin: 6px 0 0; font-size: 10px; line-height: 1.5; color: #d1c5aa; } button { margin-top: 6px; padding: 4px 8px; font-size: 10px; }
-@media (max-height: 850px) and (min-width: 951px) { .results-scroll { max-height: 120px; } .round-results { padding: 7px 12px; } }
+@media (max-height: 850px) and (min-width: 951px) { .round-results { padding: 7px 12px; } }
 </style>
