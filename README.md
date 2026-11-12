@@ -1,5 +1,50 @@
 # Minority Pact
 
+本機執行的五席 AI 談判與秘密投票遊戲，支援不同模型、真人取代一席、手動 Markdown 模式，以及終局全知重播。預設少數色只有一席得 5 分、兩席各得 2 分，多數色得 0 分；另可啟用雙人條件付款契約。
+
+## 首次使用
+
+需要 Node.js 24 以上與 npm。下載本 repo 後，在專案目錄執行：
+
+```powershell
+npm.cmd ci
+npm.cmd start
+```
+
+開啟 http://127.0.0.1:3000，在「新對局 ＋」選擇模式與席位，再建立並開始。macOS／Linux 請將 npm.cmd 換成 npm。
+
+無 API key 可先選「手動檔案（自動檢查回覆）」，依 [手動模式](docs/MANUAL_MODE.md) 操作；外部 AI 服務可能另有費用。自動 OpenRouter 模式則先複製設定範本：
+
+```powershell
+Copy-Item .env.example .env
+```
+
+用文字編輯器將 key 填入本機 .env，再重啟服務。macOS／Linux 使用 cp .env.example .env。開始或繼續 API 對局會呼叫付費模型；安裝、建置與下列離線測試不會。模型可用性與參數相容性依供應商而定，設定範例不保證永久可用。
+
+## 開發驗證
+
+```powershell
+npm.cmd run typecheck
+npm.cmd run web:check
+npm.cmd test
+npm.cmd run build
+# 需已安裝 Chrome，其他安裝位置可設定 BROWSER_PATH
+npm.cmd run test:browser
+```
+
+測試使用腳本代理或 mock HTTP，不需 API key。真正多模型 smoke 依成本要求停在第 5 回合、完成 4 回合，尚未完成真正 10 回合驗收；離線測試不證明模型策略能力。
+
+## 資料與使用範圍
+
+- 預設只監聽 127.0.0.1:3000，是本機單使用者工具，未提供多人帳號或正式網際網路部署支援。
+- API 模式會將各席授權的遊戲上下文送至 OpenRouter／所選模型供應商。不要在遊戲訊息中輸入 key 或其他敏感資料。
+- SQLite、手動檔案及稽核紀錄含未加密的私訊、策略與原始模型回覆，不應直接分享。終局全知重播會揭露保存的私訊與策略。
+- 本專案仍在實驗階段；較早規格與進度可能已由後續補充取代，詳見 [架構](ARCHITECTURE.md) 與 [驗證紀錄](docs/PROGRESS.md)。
+- 目前沒有 LICENSE，尚未指定開源授權。AI 素材來源見 [素材說明](docs/AVATAR_ASSETS.md)。
+- 公開前檢查範圍與待決事項見 [公開檢查](docs/PUBLIC_READINESS.md)；安全回報見 [SECURITY.md](SECURITY.md)。
+
+## 操作細節
+
 真人模式：重啟服務後，在「新對局 ＋」選擇「參與方式」中的A～E席位，再建立並開始對局。點「你的行動」可發公開訊息、準備多則私訊或空白提交；「提交並推進」完成本批，「我已準備投票」則表示願意結束交涉。投票階段選紅／藍後確認，不設真人倒數。可收起面板閱讀紀錄，自己的私訊即時可見，其他席位私訊保密。提交後鎖定並保存，未提交草稿重新整理可能清除。真人模式只透過本機瀏覽器服務操作，CLI保留AI觀戰用途；不會向AI提供真人身分標記。
 
 新局交涉上限為30秒遊戲時間（最多6個五秒窗口）。私訊會在下一窗口喚醒收件席；即使未訂閱訊息，距上次決策15秒也會重新判斷。公開訂閱與是否發言仍由玩家自行決定。舊局保留保存的時間與喚醒規則，更新後請重啟服務並建立新局。
@@ -22,11 +67,7 @@ Node 原生執行 TypeScript 測試，不需測試框架或 API key。TypeScript
 
 `configs/experimental.json` 已提供五個不同低成本模型 ID。`llm` 保存共用參數及未指定 seatModels 時的預設；seatModels 可逐席覆寫模型。API key 從 OPENROUTER_API_KEY 讀取（見 .env.example），不傳入瀏覽器。
 
-`parseConfig(unknown)` 與 `parseDecision(unknown)` 是 runtime 驗證入口。規則引擎接收已驗證設定；`resolveBatch` 只接當下到期行動，未來 action、批次 ID 冪等與快照由 T3/T4 負責。回傳事件以 `reduce` 套用到新狀態；輸入不被修改。reveal 後以空批次推進下一回合或終局，便於後續觀戰呈現揭曉階段。
-
-`src/contracts/public.ts` 為公開 DTO；`DecisionInput` 是僅可交給對應 controller 的授權資料；`src/domain/engine.ts` 與 `application/ports.ts` 的內部事件含秘密，不得直接序列化對外。對外事件讀取走 `ReplayService`，以可信身分產生投影；`projectEvent` 為內部工具，不能直接由 HTTP 參數開啟全知。SQLite 使用 Node 內建 `node:sqlite`，已在本機 Node 24.22.1 驗證。
-
-規則、時間與政策細節見 `ARCHITECTURE.md`；後續任務見 `IMPLEMENTATION_PLAN.md`，實際驗證狀態見 `docs/PROGRESS.md`。
+開發架構與資訊邊界見 [ARCHITECTURE.md](ARCHITECTURE.md)，實際驗證狀態見 [docs/PROGRESS.md](docs/PROGRESS.md)。
 
 ## OpenRouter 命令列對局
 
@@ -46,7 +87,7 @@ npm.cmd run game -- resume configs/local.json data/games.sqlite SESSION_ID
 
 CLI 依真實時間等待邏輯時間間隔，LLM 推理期間停鐘。失敗最多重試 2 次後保留 pending decisions，退出並允許 resume。資料庫旁 `.lock` 防止兩個 CLI 同時執行；若程序被強制終止留下 lock，確認沒有對局程序仍執行後再手動移除 lock。不要同時以其他程式寫入同一資料庫。
 
-未指定 `llm.parameters.reasoning` 時，GLM 5.3／Flash 採 `{"effort":"low"}`；Qwen3.8 Flash 採 `{"max_tokens":1024}`，限制推理用量（總輸出上限仍為4096）。Qwen的low請求曾實際耗盡4096推理token，其[官方模型資料](https://openrouter.ai/api/v1/models)標示支援推理token預算，未標示effort選項。若使用者將總輸出上限調至1024以下，Qwen預設關閉可選推理；明確的reasoning設定優先保留。此預設於載入席位時套用，因此重啟後恢復舊局也適用，不改寫原始設定或成功決策。截斷會停止自動重試，需手動處理後再繼續，不自動提高費用上限。
+未指定 `llm.parameters.reasoning` 時，GLM 5.3／Flash 採 `{"effort":"low"}`；Qwen3.8 Flash 採 `{"max_tokens":1024}`，限制推理用量（目前預設總輸出上限為8192，舊局依保存值與執行時下限決定）。Qwen的low請求曾實際耗盡4096推理token，其[官方模型資料](https://openrouter.ai/api/v1/models)標示支援推理token預算，未標示effort選項。若使用者將總輸出上限調至1024以下，Qwen預設關閉可選推理；明確的reasoning設定優先保留。此預設於載入席位時套用，因此重啟後恢復舊局也適用，不改寫原始設定或成功決策。截斷會停止自動重試，需手動處理後再繼續，不自動提高費用上限。
 
 ## 本機 LLM 呼叫紀錄
 

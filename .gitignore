@@ -5,3 +5,16 @@ coverage/
 .npm-cache/
 configs/local.json
 dist/
+
+# Local environment variants; retain the empty template
+.env.*
+!.env.example
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+*.log
+*.pem
+*.key
+playwright-report/
+test-results/

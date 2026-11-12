@@ -1,5 +1,11 @@
 # 實作進度 — 2026-11-08
 
+## 2026-11-12 公開前檢查
+
+檢查本機所有 refs 可達歷史（615 物件、353 唯一 blob），常見 key／私鑰格式未命中；未見 .env、data/、.npm-cache/ 曾受追蹤。補強環境檔變體、資料庫旁檔、私鑰與測試產物忽略規則；README 補首次安裝、無 key 模式、費用／資料流、測試與限制，移除過期任務實作描述，修正輸出預算及素材接入狀態。刪除文件中的本機生成絕對路徑，新增 SECURITY.md 與 docs/PUBLIC_READINESS.md。既有未追蹤文字檔不加入提交。
+
+驗證：npm.cmd run typecheck、npm.cmd run web:check 通過；npm.cmd test 全部 129 項通過（0 失敗）。git diff --check 通過，ignore 規則確認 .env、.env.local、SQLite 旁檔與私鑰被排除、.env.example 仍追蹤。本次僅文件及 ignore 更動，未改前端執行內容，因此未重跑 build／browser QA。未執行付費 API、未恢復對局。fetch 後本機 master 與 origin/master 一致。尚待作者決定歷史個人 email 與程式／素材授權；未改寫歷史、未指定 LICENSE、未改 repository visibility。此檢查不包含套件漏洞資料庫、GitHub artifacts／Issues 或遠端不可達歷史，不是完整安全稽核。
+
 輸入去重與30秒交涉完成：experimental預設改30000ms／六個五秒窗口，rulesVersion=minority-pact-v4-30s、promptVersion=v5-zh-TW-deduplicated。新增providerInput在OpenRouter序列化邊界消除history已涵蓋的ownNotes與privateMessages副本；原history、事件ID、新事件清單、內部快照及驗證不變。舊／自訂快照若有history未包含的資訊仍以補充欄位送出，備忘錄以出現次數比對以免遺失重複但合法的紀錄。提示已改為從history讀取策略與私訊，允許補充欄位不存在。既有局重啟後再次請求也會去重，但原交涉秒數不回寫；30秒須建立新局。
 
 驗證：typecheck、web:check、117項離線測試、Vite build與Chrome scripted browser QA全通過。涵蓋真人六窗口完成、備忘錄／私訊僅傳一份、不修改原快照、缺漏資訊補送、原目標驗證與重啟恢復。取既有C席第5回合一份快照離線試算，輸入JSON字元258778降至188884，減少27.0%；非token量測或實際費用節省保證。未呼叫付費API、未恢復對局，未做歷史裁切或摘要。下一步：停止原服務後npm.cmd start、重新整理並建立新局，使用30秒／六窗口；觀察真實用量需由使用者正常遊玩取得紀錄。

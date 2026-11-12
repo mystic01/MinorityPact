@@ -16,7 +16,6 @@
 使用內建 `image_gen`，不是 CLI。參考上述選定概念圖，只取環境氣氛，無人物與文字。
 
 - 圖檔：[`web/public/scenes/conservatory-v1.png`](../web/public/scenes/conservatory-v1.png)
-- 原始生成位置：`C:/Users/Mystic/.codex/generated_images/01a1b85a-8ce0-7161-abc4-273b387585d1/exec-a191e6c3-44a7-4465-829d-84a77d68c0a6.png`
 - 提示原文：
 
 ```text

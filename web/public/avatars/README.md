@@ -12,7 +12,7 @@
 
 每個角色目錄包含 neutral.png（中性）、speaking.png（發言）、smile.png（微笑）、doubtful.png（疑惑）、surprised.png（驚訝）。檔案網址格式為 /avatars/A/neutral.png，以此類推。
 
-manifest.json 提供角色／表情與URL對應；本階段只準備素材，未修改遊戲畫面、AI人格或規則。角色屬於席位而非固定模型品牌，換模型仍可保留同一外觀。
+manifest.json 提供角色／表情與URL對應，目前已接入遊戲畫面；素材不賦予 AI 人格，也不改變規則。角色屬於席位而非固定模型品牌，換模型仍可保留同一外觀。
 
 中性圖是每位角色的基準，表情圖由該基準直接編修。生成提示保留於 docs/AVATAR_PROMPTS.json。AI生成可能有細微像素／線條差異，不應假設像素級完全重合。
 
