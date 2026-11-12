@@ -1,5 +1,11 @@
 # 實作進度 — 2026-11-08
 
+## 2026-11-12 MIT 授權
+
+依作者確認新增標準 MIT LICENSE（Copyright (c) 2026 Mystic），同步 package.json 與 lockfile 根套件的 license: MIT。README 說明授權涵蓋程式、文件及隨附素材中作者可授權的權利，第三方依賴維持各自授權。公開檢查清單記錄作者接受歷史 email 公開及已選擇 MIT；先前檢查紀錄保留為當時狀態。
+
+驗證：typecheck、web:check、129 項離線測試全部通過，套件與 lockfile 授權欄位一致，git diff --check 通過。僅授權、metadata 與文件更動，未改前端執行內容，未重跑 build／browser QA；無付費 API、未恢復對局、未改 repository visibility。fetch 後 master 與 origin/master 一致。
+
 ## 2026-11-12 公開前檢查
 
 檢查本機所有 refs 可達歷史（615 物件、353 唯一 blob），常見 key／私鑰格式未命中；未見 .env、data/、.npm-cache/ 曾受追蹤。補強環境檔變體、資料庫旁檔、私鑰與測試產物忽略規則；README 補首次安裝、無 key 模式、費用／資料流、測試與限制，移除過期任務實作描述，修正輸出預算及素材接入狀態。刪除文件中的本機生成絕對路徑，新增 SECURITY.md 與 docs/PUBLIC_READINESS.md。既有未追蹤文字檔不加入提交。

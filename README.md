@@ -40,7 +40,7 @@ npm.cmd run test:browser
 - API 模式會將各席授權的遊戲上下文送至 OpenRouter／所選模型供應商。不要在遊戲訊息中輸入 key 或其他敏感資料。
 - SQLite、手動檔案及稽核紀錄含未加密的私訊、策略與原始模型回覆，不應直接分享。終局全知重播會揭露保存的私訊與策略。
 - 本專案仍在實驗階段；較早規格與進度可能已由後續補充取代，詳見 [架構](ARCHITECTURE.md) 與 [驗證紀錄](docs/PROGRESS.md)。
-- 目前沒有 LICENSE，尚未指定開源授權。AI 素材來源見 [素材說明](docs/AVATAR_ASSETS.md)。
+- 本專案採 [MIT License](LICENSE)，涵蓋本 repo 的程式、文件及隨附頭像／背景素材中作者可授權的權利；第三方依賴仍依各自授權。AI 素材來源見 [素材說明](docs/AVATAR_ASSETS.md)。
 - 公開前檢查範圍與待決事項見 [公開檢查](docs/PUBLIC_READINESS.md)；安全回報見 [SECURITY.md](SECURITY.md)。
 
 ## 操作細節
